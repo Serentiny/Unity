@@ -1,0 +1,19 @@
+fileFormatVersion: 2
+guid: 4fe088303de5ff44eb852b9fbc19091c
+timeCreated: 1473603735
+licenseType: Free
+MonoImporter:
+  serializedVersion: 2
+  defaultReferences:
+  - Player: {fileID: 111666, guid: c98d20dc126eb814f92ea8150ea8d0ec, type: 2}
+  - WayPoint: {fileID: 131012, guid: b37f532406ecbb946975430d20b6a199, type: 2}
+  - RotatePoint: {fileID: 114398, guid: ffe56f5127be9f1499b11e9c1e2544bc, type: 2}
+  - Column: {fileID: 128180, guid: ad55df4720a7b4748874708f09c8c6c1, type: 2}
+  - Cell_Empty: {fileID: 199774, guid: b2f3d87898e48af449879ca63dc0da25, type: 2}
+  - Cell_Wall: {fileID: 151726, guid: 105f664d0ffaf8343b1755fa8b15e492, type: 2}
+  - Cell_Exit: {fileID: 106914, guid: 506926036a6060c4cb0322afac19510f, type: 2}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
