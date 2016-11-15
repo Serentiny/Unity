@@ -6,12 +6,16 @@ public class CameraOption : MonoBehaviour
     public GameObject player;
     public Canvas canvasDebug, canvasLogo;
     public UnityEngine.UI.Text fps;
-    public UnityEngine.UI.Text textAccelerateAvailable, textAccelerationX, textAccelerationY, textAccelerationZ;
-    public UnityEngine.UI.Text textCompassAvailable,    textCompassRawX,   textCompassRawY,   textCompassRawZ,   textCompassAngle;
-    public UnityEngine.UI.Text textHorizontalAngle,     textVerticalAngle, textSpinAngle;
+    public UnityEngine.UI.Text textAccelerationAvailable, textAccelerationX, textAccelerationY, textAccelerationZ;
+    public UnityEngine.UI.Text textGyroscopeAvailable,    textGyroscopeX,    textGyroscopeY,    textGyroscopeZ;
+    public UnityEngine.UI.Text textCompassAvailable,      textCompassRawX,   textCompassRawY,   textCompassRawZ,   textCompassAngle;
+    public UnityEngine.UI.Text textHorizontalAngle,       textVerticalAngle, textSpinAngle;
 
     const float logoTime = 2.0f;
     const int   smoothSize = 8;
+
+    //flags for working with rotating
+    bool isAcceleration = false, isGyroscope = false, isCompass = false;
 
     //time counters for FPS and DoubleTap for smartphones
     float fpsDeltaTime = 0.0f, touchLastTime = 0.0f;   
@@ -40,6 +44,7 @@ public class CameraOption : MonoBehaviour
         canvasLogo.gameObject.SetActive(true);
         
         CheckAcceleration();
+        CheckGyroscope();
         CheckCompass();
 
         firstHorizontalAngleQueue = new Queue<float>();
@@ -72,8 +77,12 @@ public class CameraOption : MonoBehaviour
             MenuDebugUpdate();
 
         //Rotating camera with the smartphone
-        if (CheckCompass() && CheckAcceleration())
+        if (isCompass && isAcceleration)
             TwoStepSmoothRotating();
+        else if (isGyroscope)
+            { }
+        else if (isAcceleration)
+            { }
 
         //Reset touch counter after small delay or after double click
         if (Time.realtimeSinceStartup - touchLastTime > 0.25f || touchCounter >= 2)
@@ -89,30 +98,43 @@ public class CameraOption : MonoBehaviour
         }
     }
 
-    bool CheckCompass()
+    void CheckCompass()
     {
         if (Input.compass.enabled)
         {
             textCompassAvailable.text = "Compass is available";
-            return true;
+            isCompass = true;
         }
         else
         {
             textCompassAvailable.text = "Compass is NOT available";
-            return false;
+            isCompass = false;
         }
     }
-    bool CheckAcceleration()
+    void CheckGyroscope()
     {
-        if (Input.acceleration.x + Input.acceleration.y + Input.acceleration.z != 0)
+        if (Input.gyro.enabled)
         {
-            textAccelerateAvailable.text = "Acceleration is available";
-            return true;
+            textGyroscopeAvailable.text = "Gyroscope is available";
+            isGyroscope = true;
         }
         else
         {
-            textAccelerateAvailable.text = "Acceleration is NOT available";
-            return false;
+            textGyroscopeAvailable.text = "Gyroscope is NOT available";
+            isGyroscope = false;
+        }
+    }
+    void CheckAcceleration()
+    {
+        if (Input.acceleration.x + Input.acceleration.y + Input.acceleration.z != 0)
+        {
+            textAccelerationAvailable.text = "Acceleration is available";
+            isAcceleration = true;
+        }
+        else
+        {
+            textAccelerationAvailable.text = "Acceleration is NOT available";
+            isAcceleration = false;
         }
 
     }
@@ -139,6 +161,10 @@ public class CameraOption : MonoBehaviour
         textAccelerationX.text = Input.acceleration.x.ToString(" 0.000");
         textAccelerationY.text = Input.acceleration.y.ToString(" 0.000");
         textAccelerationZ.text = Input.acceleration.z.ToString(" 0.000");
+
+        textGyroscopeX.text = Input.gyro.attitude.x.ToString(" 0.000");
+        textGyroscopeY.text = Input.gyro.attitude.y.ToString(" 0.000");
+        textGyroscopeZ.text = Input.gyro.attitude.z.ToString(" 0.000");
 
         textCompassRawX.text = Input.compass.rawVector.x.ToString(" 000");
         textCompassRawY.text = Input.compass.rawVector.y.ToString(" 000");
