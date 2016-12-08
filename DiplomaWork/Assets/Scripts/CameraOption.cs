@@ -5,22 +5,26 @@ using UnityEngine;
 public class CameraOption : MonoBehaviour
 {
     public GameObject player;
-    public Canvas canvasDebug, canvasLogo;
+    public Canvas canvasDebug, canvasLogo, canvasAutocalibration;
     public UnityEngine.UI.Text fps;
-    public UnityEngine.UI.Text textGyroscopeAvailable,    textGyroscopeX,    textGyroscopeY,    textGyroscopeZ;
-    public UnityEngine.UI.Text textCompassAvailable,      textCompassRawX,   textCompassRawY,   textCompassRawZ,   textCompassAngle;
+    public UnityEngine.UI.Text textGyroscopeAvailable, textGyroscopeX, textGyroscopeY, textGyroscopeZ;
+    public UnityEngine.UI.Text textCompassAvailable, textCompassRawX, textCompassRawY, textCompassRawZ, textCompassAngle;
     public UnityEngine.UI.Text textAccelerationAvailable, textAccelerationX, textAccelerationY, textAccelerationZ;
-    public UnityEngine.UI.Text textHorizontalAngle,       textVerticalAngle, textSpinAngle;
+    public UnityEngine.UI.Text textHorizontalAngle, textVerticalAngle, textSpinAngle;
 
-    //Flags for working with rotating
+    // Flags for working with rotating
     bool isGyroscope = false, isCompass = false, isAcceleration = false;
 
-    //Time counters for FPS and DoubleTap for smartphones
-    float fpsDeltaTime = 0.0f, touchLastTime = 0.0f;   
-    int touchCounter = 0;  
+    // Time counters for FPS and DoubleTap for smartphones
+    float fpsDeltaTime = 0.0f, touchLastTime = 0.0f;
+    int touchCounter = 0;
 
-    //Current angles of camera
-    float curAngleHorizontal = 0.0f, curAngleVertical = 0.0f, curAngleSpin = 0.0f;   
+    // Current angles of camera
+    float curAngleHorizontal = 0.0f, curAngleVertical = 0.0f, curAngleSpin = 0.0f;
+
+    // Variables for calibration gyroscope
+    bool isCalibrated = false, isCalm = true, isJerky = false;
+    float timeFromEndJerky = 0.0f;
 
     void Start()
     {
@@ -37,6 +41,7 @@ public class CameraOption : MonoBehaviour
     void Init()
     {
         canvasDebug.gameObject.SetActive(false);
+        canvasAutocalibration.gameObject.SetActive(false);
         StartCoroutine(ShowLogo());
     }
 
@@ -97,27 +102,32 @@ public class CameraOption : MonoBehaviour
         textAccelerationY.text = Input.acceleration.y.ToString(" 0.000;-0.000");
         textAccelerationZ.text = Input.acceleration.z.ToString(" 0.000;-0.000");
 
-        textGyroscopeX.text = Input.gyro.rotationRateUnbiased.x.ToString(" 0.000;-0.000");
-        textGyroscopeY.text = Input.gyro.rotationRateUnbiased.y.ToString(" 0.000;-0.000");
-        textGyroscopeZ.text = Input.gyro.rotationRateUnbiased.z.ToString(" 0.000;-0.000");
+        textGyroscopeX.text = Input.gyro.attitude.x.ToString(" 00.000;-00.000");
+        textGyroscopeY.text = Input.gyro.attitude.y.ToString(" 00.000;-00.000");
+        textGyroscopeZ.text = Input.gyro.attitude.z.ToString(" 00.000;-00.000");
 
         textCompassRawX.text = Input.compass.rawVector.x.ToString(" 000;-000");
         textCompassRawY.text = Input.compass.rawVector.y.ToString(" 000;-000");
         textCompassRawZ.text = Input.compass.rawVector.z.ToString(" 000;-000");
         textCompassAngle.text = Input.compass.magneticHeading.ToString(" 000.00");
 
-        textVerticalAngle.text   = curAngleVertical.ToString(" 000.00;-000.00");
+        textVerticalAngle.text = curAngleVertical.ToString(" 000.00;-000.00");
         textHorizontalAngle.text = curAngleHorizontal.ToString(" 000.00;-000.00");
-        textSpinAngle.text       = curAngleSpin.ToString(" 000.00;-000.00");
+        textSpinAngle.text = curAngleSpin.ToString(" 000.00;-000.00");
     }
 
     void CameraRotating()
     {
         if (isGyroscope && isCompass && isAcceleration)
         {
+            CheckRotateSpeed();
+
+            if (!isCalibrated && isCalm)
+                Calibration();
+
             curAngleHorizontal = -Input.gyro.rotationRateUnbiased.y;
-            curAngleVertical = -Input.gyro.rotationRateUnbiased.x;
-            curAngleSpin =  Input.gyro.rotationRateUnbiased.z;
+            curAngleVertical   = -Input.gyro.rotationRateUnbiased.x;
+            curAngleSpin       =  Input.gyro.rotationRateUnbiased.z;
 
             player.transform.Rotate(curAngleVertical, curAngleHorizontal, curAngleSpin);
         }
@@ -140,7 +150,6 @@ public class CameraOption : MonoBehaviour
             // I do not want to check ( C) and ( A) choices
         }
     }
-
 
     float QueueMedian(ref Queue<float> q)
     {
@@ -176,7 +185,7 @@ public class CameraOption : MonoBehaviour
         else
             return s / q.Count;
 
-        
+
         /*
         SLOW but work
 
@@ -192,10 +201,55 @@ public class CameraOption : MonoBehaviour
             return Mathf.Rad2Deg * Mathf.Atan2(s, c) + 360;
         */
     }
-    
+
+    void CheckRotateSpeed()
+    {
+        const float maxNormalRotateSpeed = 5.0f, timeToCalmDown = 3.0f;
+
+        if (GyroscopeRotateSpeed() > maxNormalRotateSpeed)
+        {
+            if (canvasAutocalibration.gameObject.activeSelf)
+            {
+                canvasAutocalibration.GetComponent<Animation>().Stop();
+                canvasAutocalibration.gameObject.SetActive(false);
+            }
+
+            isCalm = false;
+            isCalibrated = false;
+            timeFromEndJerky = Time.realtimeSinceStartup;
+            isJerky = true;
+        }
+        else
+        {
+            if (isJerky && !canvasAutocalibration.gameObject.activeSelf)
+            {
+                canvasAutocalibration.gameObject.SetActive(true);
+                canvasAutocalibration.GetComponent<Animation>().Play();
+            }
+
+            isJerky = false;
+        }
+
+        if (!isCalm && Time.realtimeSinceStartup - timeFromEndJerky > timeToCalmDown)
+        {
+            canvasAutocalibration.GetComponent<Animation>().Stop();
+            canvasAutocalibration.gameObject.SetActive(false);
+            isCalm = true;
+        }
+    }
+    float GyroscopeRotateSpeed()
+    {
+        return Mathf.Abs(Input.gyro.rotationRateUnbiased.x) + Mathf.Abs(Input.gyro.rotationRateUnbiased.y) + Mathf.Abs(Input.gyro.rotationRateUnbiased.z);
+    }
+    void Calibration()
+    {
+        player.transform.localEulerAngles = new Vector3(Input.acceleration.z * -90, Input.compass.magneticHeading, Input.acceleration.x * -90);
+        isCalibrated = true;
+    }
+
     IEnumerator ShowLogo()
     {
-        const float logoTime = 2.0f;
+        const float logoTime = 1.5f;
         canvasLogo.gameObject.SetActive(true);
 
         yield return new WaitForSeconds(logoTime);
