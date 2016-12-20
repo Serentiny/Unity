@@ -2,28 +2,29 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class CameraOption : MonoBehaviour
+public class Main: MonoBehaviour
 {
     public GameObject player;
-    public Canvas canvasDebug, canvasLogo, canvasAutocalibration;
-    public UnityEngine.UI.Text fps;
-    public UnityEngine.UI.Text textGyroscopeAvailable, textGyroscopeX, textGyroscopeY, textGyroscopeZ;
-    public UnityEngine.UI.Text textCompassAvailable, textCompassRawX, textCompassRawY, textCompassRawZ, textCompassAngle;
-    public UnityEngine.UI.Text textAccelerationAvailable, textAccelerationX, textAccelerationY, textAccelerationZ;
-    public UnityEngine.UI.Text textHorizontalAngle, textVerticalAngle, textSpinAngle;
+    public Canvas canvasDebug, canvasLogo, canvasAutocalibration, canvasError;
+    public UnityEngine.UI.Text error, fps;
+    public UnityEngine.UI.Text accelerationAvailable, compassAvailable, gyroscopeAvailable;
+    public UnityEngine.UI.Text accelerationX, accelerationY, accelerationZ;
+    public UnityEngine.UI.Text compassRawX, compassRawY, compassRawZ, compassAngle;
+    public UnityEngine.UI.Text gyroAttitudeX, gyroAttitudeY, gyroAttitudeZ, gyroAttitudeW, gyroRotUnbiasX, gyroRotUnbiasY, gyroRotUnbiasZ;
+    public UnityEngine.UI.Text verticalAngle, horizontAngle, spinAngle;
 
     // Flags for working with rotating
-    bool isGyroscope = false, isCompass = false, isAcceleration = false;
+    bool isGyroscope = false, isCompass = false, isAcceleration = false, areSensorsChecked = false;
 
     // Time counters for FPS and DoubleTap for smartphones
     float fpsDeltaTime = 0.0f, touchLastTime = 0.0f;
     int touchCounter = 0;
 
     // Current angles of camera
-    float curAngleHorizontal = 0.0f, curAngleVertical = 0.0f, curAngleSpin = 0.0f;
+    float curAngleHorizont = 0.0f, curAngleVertical = 0.0f, curAngleSpin = 0.0f;
 
     // Variables for calibration gyroscope
-    bool isCalibrated = false, isCalm = true, isJerky = false;
+    bool isCalibrated = false, isDeviceCalm = true, isDeviceJerky = false;
     float timeFromEndJerky = 0.0f;
 
     void Start()
@@ -42,6 +43,7 @@ public class CameraOption : MonoBehaviour
     {
         canvasDebug.gameObject.SetActive(false);
         canvasAutocalibration.gameObject.SetActive(false);
+        canvasError.gameObject.SetActive(false);
         StartCoroutine(ShowLogo());
     }
 
@@ -60,7 +62,7 @@ public class CameraOption : MonoBehaviour
 
         //Update the values in debug menu
         if (canvasDebug.gameObject.activeSelf)
-            MenuDebugUpdate();
+            OptionSensorsUpdate();
 
         //Rotating camera with the smartphone
         CameraRotating();
@@ -94,60 +96,81 @@ public class CameraOption : MonoBehaviour
             canvasDebug.gameObject.SetActive(true);
     }
 
-    void MenuDebugUpdate()
+    void OptionSensorsUpdate()
     {
-        fps.text = (1.0f / fpsDeltaTime).ToString("00.0 ");
+        fps.text = (1.0f / fpsDeltaTime).ToString("00.0") + " FPS";
 
-        textAccelerationX.text = Input.acceleration.x.ToString(" 0.000;-0.000");
-        textAccelerationY.text = Input.acceleration.y.ToString(" 0.000;-0.000");
-        textAccelerationZ.text = Input.acceleration.z.ToString(" 0.000;-0.000");
+        accelerationX.text = "Acceleration.X = " + Input.acceleration.x.ToString(" 0.000;-0.000");
+        accelerationY.text = "Acceleration.Y = " + Input.acceleration.y.ToString(" 0.000;-0.000");
+        accelerationZ.text = "Acceleration.Z = " + Input.acceleration.z.ToString(" 0.000;-0.000");
 
-        textGyroscopeX.text = Input.gyro.attitude.x.ToString(" 00.000;-00.000");
-        textGyroscopeY.text = Input.gyro.attitude.y.ToString(" 00.000;-00.000");
-        textGyroscopeZ.text = Input.gyro.attitude.z.ToString(" 00.000;-00.000");
+        compassRawX.text  = "RawVector.X = " + Input.compass.rawVector.x.ToString(" 000;-000");
+        compassRawY.text  = "RawVector.Y = " + Input.compass.rawVector.y.ToString(" 000;-000");
+        compassRawZ.text  = "RawVector.Z = " + Input.compass.rawVector.z.ToString(" 000;-000");
+        compassAngle.text = "MagnetHeading = " + Input.compass.magneticHeading.ToString(" 000.00");
 
-        textCompassRawX.text = Input.compass.rawVector.x.ToString(" 000;-000");
-        textCompassRawY.text = Input.compass.rawVector.y.ToString(" 000;-000");
-        textCompassRawZ.text = Input.compass.rawVector.z.ToString(" 000;-000");
-        textCompassAngle.text = Input.compass.magneticHeading.ToString(" 000.00");
+        gyroAttitudeX.text  = "Attitude.X = " + Input.gyro.attitude.x.ToString(" 00.000;-00.000");
+        gyroAttitudeY.text  = "Attitude.Y = " + Input.gyro.attitude.y.ToString(" 00.000;-00.000");
+        gyroAttitudeZ.text  = "Attitude.Z = " + Input.gyro.attitude.z.ToString(" 00.000;-00.000");
+        gyroAttitudeW.text  = "Attitude.W = " + Input.gyro.attitude.w.ToString(" 00.000;-00.000");
+        gyroRotUnbiasX.text = "RotationRateUnbiased.X = " + Input.gyro.rotationRateUnbiased.x.ToString(" 00.000;-00.000");
+        gyroRotUnbiasY.text = "RotationRateUnbiased.Y = " + Input.gyro.rotationRateUnbiased.y.ToString(" 00.000;-00.000");
+        gyroRotUnbiasZ.text = "RotationRateUnbiased.Z = " + Input.gyro.rotationRateUnbiased.z.ToString(" 00.000;-00.000");
 
-        textVerticalAngle.text = curAngleVertical.ToString(" 000.00;-000.00");
-        textHorizontalAngle.text = curAngleHorizontal.ToString(" 000.00;-000.00");
-        textSpinAngle.text = curAngleSpin.ToString(" 000.00;-000.00");
+        verticalAngle.text = "Vertical = " + curAngleVertical.ToString(" 000.00;-000.00");
+        horizontAngle.text = "Horizont = " + curAngleHorizont.ToString(" 000.00;-000.00");
+        spinAngle.text     = "Spin = " + curAngleSpin.ToString(" 000.00;-000.00");
     }
 
     void CameraRotating()
     {
+        if (!areSensorsChecked)
+            return;
+
         if (isGyroscope && isCompass && isAcceleration)
         {
             CheckRotateSpeed();
 
-            if (!isCalibrated && isCalm)
+            if (!isCalibrated && isDeviceCalm)
                 Calibration();
 
-            curAngleHorizontal = -Input.gyro.rotationRateUnbiased.y;
-            curAngleVertical   = -Input.gyro.rotationRateUnbiased.x;
-            curAngleSpin       =  Input.gyro.rotationRateUnbiased.z;
+            curAngleVertical = -Input.gyro.rotationRateUnbiased.x;
+            curAngleHorizont = -Input.gyro.rotationRateUnbiased.y;
+            curAngleSpin = Input.gyro.rotationRateUnbiased.z;
 
-            player.transform.Rotate(curAngleVertical, curAngleHorizontal, curAngleSpin);
+            player.transform.Rotate(curAngleVertical, curAngleHorizont, curAngleSpin);
+
+            curAngleVertical = player.transform.eulerAngles.x;
+            curAngleHorizont = player.transform.eulerAngles.y;
+            curAngleSpin = player.transform.eulerAngles.z;
         }
         else if (isGyroscope)
         {
             // Similar to above but with manual calibration
+
+            if (!canvasError.gameObject.activeSelf)
+            {
+                if (!isAcceleration || !isCompass)
+                    error.text = "Sorry, you have gyroscope but there is no acceleration or compass on that device.";
+                canvasError.gameObject.SetActive(true);
+            }
         }
         else if (isCompass && isAcceleration)
         {
-            curAngleHorizontal = Input.compass.magneticHeading;
-            curAngleVertical   = Input.acceleration.z * -90;
-            curAngleSpin       = Input.acceleration.x * -90;
+            curAngleVertical = Input.acceleration.z * -90;
+            curAngleHorizont = Input.compass.magneticHeading;
+            curAngleSpin = Input.acceleration.x * -90;
 
-            player.transform.rotation = Quaternion.Slerp(player.transform.rotation, Quaternion.Euler(curAngleVertical, curAngleHorizontal, curAngleSpin), Time.deltaTime);
+            player.transform.rotation = Quaternion.Slerp(player.transform.rotation, Quaternion.Euler(curAngleVertical, curAngleHorizont, curAngleSpin), Time.deltaTime);
         }
         else
         {
-            // You are looser =)
-            // I do not want to check (GC) and (GA) choices
-            // I do not want to check ( C) and ( A) choices
+            if (!canvasError.gameObject.activeSelf)
+            {
+                if (!isAcceleration || !isCompass)
+                    error.text = "Sorry, there is no gyroscope, acceleration or compass on that device.";
+                canvasError.gameObject.SetActive(true);
+            }
         }
     }
 
@@ -214,27 +237,27 @@ public class CameraOption : MonoBehaviour
                 canvasAutocalibration.gameObject.SetActive(false);
             }
 
-            isCalm = false;
+            isDeviceCalm = false;
             isCalibrated = false;
             timeFromEndJerky = Time.realtimeSinceStartup;
-            isJerky = true;
+            isDeviceJerky = true;
         }
         else
         {
-            if (isJerky && !canvasAutocalibration.gameObject.activeSelf)
+            if (isDeviceJerky && !canvasAutocalibration.gameObject.activeSelf)
             {
                 canvasAutocalibration.gameObject.SetActive(true);
                 canvasAutocalibration.GetComponent<Animation>().Play();
             }
 
-            isJerky = false;
+            isDeviceJerky = false;
         }
 
-        if (!isCalm && Time.realtimeSinceStartup - timeFromEndJerky > timeToCalmDown)
+        if (!isDeviceCalm && Time.realtimeSinceStartup - timeFromEndJerky > timeToCalmDown)
         {
             canvasAutocalibration.GetComponent<Animation>().Stop();
             canvasAutocalibration.gameObject.SetActive(false);
-            isCalm = true;
+            isDeviceCalm = true;
         }
     }
     float GyroscopeRotateSpeed()
@@ -249,43 +272,48 @@ public class CameraOption : MonoBehaviour
 
     IEnumerator ShowLogo()
     {
+        const float sensorUp = 0.1f;
         const float logoTime = 1.5f;
         canvasLogo.gameObject.SetActive(true);
 
-        yield return new WaitForSeconds(logoTime);
-
-        canvasLogo.gameObject.SetActive(false);
-        StopCoroutine(ShowLogo());
-
+        yield return new WaitForSeconds(sensorUp);
         CheckGyroscope();
         CheckCompass();
         CheckAcceleration();
+        areSensorsChecked = true;
+
+        yield return new WaitForSeconds(logoTime);
+        canvasLogo.gameObject.SetActive(false);
+        StopCoroutine(ShowLogo());
 
         yield break;
     }
+	
     void CheckGyroscope()
     {
-        if (Input.gyro.enabled)
+        //(Input.gyro.enabled)
+		if (Input.gyro.attitude.x + Input.gyro.attitude.y + Input.gyro.attitude.z != 0)
         {
-            textGyroscopeAvailable.text = "Gyroscope is available";
+            gyroscopeAvailable.text = "Gyroscope is available";
             isGyroscope = true;
         }
         else
         {
-            textGyroscopeAvailable.text = "Gyroscope is NOT available";
+            gyroscopeAvailable.text = "Gyroscope is NOT available";
             isGyroscope = false;
         }
     }
     void CheckCompass()
     {
-        if (Input.compass.enabled)
+        //if (Input.compass.enabled)
+		if (Input.compass.rawVector.x + Input.compass.rawVector.y + Input.compass.rawVector.z != 0)
         {
-            textCompassAvailable.text = "Compass is available";
+            compassAvailable.text = "Compass is available";
             isCompass = true;
         }
         else
         {
-            textCompassAvailable.text = "Compass is NOT available";
+            compassAvailable.text = "Compass is NOT available";
             isCompass = false;
         }
     }
@@ -293,12 +321,12 @@ public class CameraOption : MonoBehaviour
     {
         if (Input.acceleration.x + Input.acceleration.y + Input.acceleration.z != 0)
         {
-            textAccelerationAvailable.text = "Acceleration is available";
+            accelerationAvailable.text = "Acceleration is available";
             isAcceleration = true;
         }
         else
         {
-            textAccelerationAvailable.text = "Acceleration is NOT available";
+            accelerationAvailable.text = "Acceleration is NOT available";
             isAcceleration = false;
         }
 
