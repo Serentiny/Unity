@@ -4,8 +4,8 @@ using UnityEngine;
 
 public class Main: MonoBehaviour
 {
-    public GameObject player;
-    public Canvas canvasDebug, canvasLogo, canvasAutocalibration, canvasError;
+    public Canvas canvasOption, canvasLogo, canvasAutocalibration, canvasError;
+    public GameObject CameraEuler;
     public UnityEngine.UI.Text error, fps;
     public UnityEngine.UI.Text accelerationAvailable, compassAvailable, gyroscopeAvailable;
     public UnityEngine.UI.Text accelerationX, accelerationY, accelerationZ;
@@ -16,16 +16,26 @@ public class Main: MonoBehaviour
     // Flags for working with rotating
     bool isGyroscope = false, isCompass = false, isAcceleration = false, areSensorsChecked = false;
 
-    // Time counters for FPS and DoubleTap for smartphones
-    float fpsDeltaTime = 0.0f, touchLastTime = 0.0f;
-    int touchCounter = 0;
+    // Time counters for FPS
+    float fpsDeltaTime = 0.0f;
+
+    // Variablis for detecting taps/swipes
+    float tapLastTime = 0.0f;
+    int tapCounter = 0;
+    Vector2 fromFirstPos, toFirstPos, fromSecondPos, toSecondPos;
+    float fromDist, toDist;
+    enum Swipe
+        { None, Up, Down, Left, Right};
+    Swipe swipeDirection;
+    bool isOptionAnimated = false;
 
     // Current angles of camera
     float curAngleHorizont = 0.0f, curAngleVertical = 0.0f, curAngleSpin = 0.0f;
 
-    // Variables for calibration gyroscope
-    bool isCalibrated = false, isDeviceCalm = true, isDeviceJerky = false;
-    float timeFromEndJerky = 0.0f;
+    // Constant variables
+    const float maxTimeToDoubleTap = 0.25f, minSwipeDist = 5.0f, maxNormalRotateSpeed = 5.0f;
+    const int doubleTap = 2;
+    //==================================================================================================================================================================================
 
     void Start()
     {
@@ -41,7 +51,7 @@ public class Main: MonoBehaviour
     }
     void Init()
     {
-        canvasDebug.gameObject.SetActive(false);
+        canvasOption.gameObject.SetActive(false);
         canvasAutocalibration.gameObject.SetActive(false);
         canvasError.gameObject.SetActive(false);
         StartCoroutine(ShowLogo());
@@ -57,49 +67,73 @@ public class Main: MonoBehaviour
             PressEscape();
 
         //Get pressed key Menu or Double tap for showing or hide menu
-        if (Input.GetKeyDown(KeyCode.Menu) || touchCounter >= 2)
+        if (Input.GetKeyDown(KeyCode.Menu) || tapCounter == doubleTap)
             PressMenu();
 
-        //Update the values in debug menu
-        if (canvasDebug.gameObject.activeSelf)
-            OptionSensorsUpdate();
+        //Update the values in Options
+        if (canvasOption.gameObject.activeSelf)
+            OptionUpdate();
 
         //Rotating camera with the smartphone
         CameraRotating();
 
         //Reset touch counter after small delay or after double click
-        if (Time.realtimeSinceStartup - touchLastTime > 0.25f || touchCounter >= 2)
-            touchCounter = 0;
+        if (Time.realtimeSinceStartup - tapLastTime > maxTimeToDoubleTap || tapCounter == doubleTap)
+            tapCounter = 0;
+        swipeDirection = Swipe.None;
 
-        //Count touches with interval lesser than small delay
+        //Detecting any touches at screen
         if (Input.touchCount > 0)
         {
-            Touch touch = Input.GetTouch(0);
-            touchLastTime = Time.realtimeSinceStartup;
-            if (touch.phase == TouchPhase.Ended)
-                touchCounter += 1;
+            if (Input.touchCount == 1)
+                CheckSwipeAndTap();
+            if (Input.touchCount == 2)
+                TwoFingersZoom();
         }
     }
-
-    void PressEscape()
+    
+    void OptionUpdate()
     {
-        if (canvasDebug.gameObject.activeSelf)
-            canvasDebug.gameObject.SetActive(false);
-        else
-            Application.Quit();
-    }
-    void PressMenu()
-    {
-        if (canvasDebug.gameObject.activeSelf)
-            canvasDebug.gameObject.SetActive(false);
-        else
-            canvasDebug.gameObject.SetActive(true);
-    }
+        if (!isOptionAnimated)
+        {
+            switch (swipeDirection)
+            {
+                case Swipe.Up:
+                    if (canvasOption.transform.FindChild("Central").gameObject.activeSelf)
+                        StartCoroutine(SwipeOptionUpFromCenter());
+                    else
+                        StartCoroutine(SwipeOptionUpToCenter());
+                    break;
+                case Swipe.Down:
+                    if (canvasOption.transform.FindChild("Central").gameObject.activeSelf)
+                        StartCoroutine(SwipeOptionDownFromCenter());
+                    else
+                        StartCoroutine(SwipeOptionDownToCenter());
+                    break;
+                case Swipe.Left:
+                    if (canvasOption.transform.FindChild("Central").gameObject.activeSelf)
+                        StartCoroutine(SwipeOptionToSensors());
+                    else
+                    if (canvasOption.transform.FindChild("Routers").gameObject.activeSelf)
+                        StartCoroutine(SwipeOptionFromRouters());
+                    break;
+                case Swipe.Right:
+                    if (canvasOption.transform.FindChild("Central").gameObject.activeSelf)
+                        StartCoroutine(SwipeOptionToRouters());
+                    else
+                    if (canvasOption.transform.FindChild("Sensors").gameObject.activeSelf)
+                        StartCoroutine(SwipeOptionFromSensors());
+                    break;
+            }
+        }
 
+        if (canvasOption.transform.FindChild("Central").gameObject.activeSelf)
+            fps.text = (1.0f / fpsDeltaTime).ToString("00.0") + " FPS";
+        if (canvasOption.transform.FindChild("Sensors").gameObject.activeSelf)
+            OptionSensorsUpdate();
+    }
     void OptionSensorsUpdate()
     {
-        fps.text = (1.0f / fpsDeltaTime).ToString("00.0") + " FPS";
-
         accelerationX.text = "Acceleration.X = " + Input.acceleration.x.ToString(" 0.000;-0.000");
         accelerationY.text = "Acceleration.Y = " + Input.acceleration.y.ToString(" 0.000;-0.000");
         accelerationZ.text = "Acceleration.Z = " + Input.acceleration.z.ToString(" 0.000;-0.000");
@@ -119,7 +153,84 @@ public class Main: MonoBehaviour
 
         verticalAngle.text = "Vertical = " + curAngleVertical.ToString(" 000.00;-000.00");
         horizontAngle.text = "Horizont = " + curAngleHorizont.ToString(" 000.00;-000.00");
-        spinAngle.text     = "Spin = " + curAngleSpin.ToString(" 000.00;-000.00");
+        spinAngle.text     = "Spin = "     + curAngleSpin.ToString(" 000.00;-000.00");
+    }
+
+    void CheckSwipeAndTap()
+    {
+        Touch t0 = Input.GetTouch(0);
+
+        switch (t0.phase)
+        {
+            case TouchPhase.Began:
+                fromFirstPos = new Vector2(t0.position.x, t0.position.y);
+                break;
+            case TouchPhase.Ended:
+                toFirstPos = new Vector2(t0.position.x, t0.position.y);
+                if (CalculateDist(ref fromFirstPos, ref toFirstPos) > minSwipeDist)
+                {
+                    float xDist = toFirstPos.x - fromFirstPos.x, yDist = toFirstPos.y - fromFirstPos.y;
+                    if (Mathf.Abs(xDist) > Mathf.Abs(yDist))
+                    {
+                        if (xDist > 0)
+                            swipeDirection = Swipe.Right;
+                        if (xDist < 0)
+                            swipeDirection = Swipe.Left;
+                    }
+                    else
+                    {
+                        if (yDist > 0)
+                            swipeDirection = Swipe.Up;
+                        if (yDist < 0)
+                            swipeDirection = Swipe.Down;
+                    }
+                }
+                else
+                {
+                    tapLastTime = Time.realtimeSinceStartup;
+                    tapCounter++;
+                }
+                break;
+        }
+    }
+    void TwoFingersZoom()
+    {
+        Touch t0 = Input.GetTouch(0);
+        Touch t1 = Input.GetTouch(1);
+
+        if (fromDist == 0)
+        {
+            fromFirstPos = new Vector2(t0.position.x, t0.position.y);
+            fromSecondPos = new Vector2(t1.position.x, t1.position.y);
+            fromDist = CalculateDist(ref fromFirstPos, ref fromSecondPos);
+        }
+        else if (t0.phase == TouchPhase.Moved || t1.phase == TouchPhase.Moved)
+        {
+            toFirstPos = new Vector2(t0.position.x, t0.position.y);
+            toSecondPos = new Vector2(t1.position.x, t1.position.y);
+            toDist = CalculateDist(ref toFirstPos, ref toSecondPos);
+
+            Camera cam = Camera.current;
+            if (toDist - fromDist > 0) // zoom in
+            {
+                if (cam.fieldOfView > 20)
+                    cam.fieldOfView--;
+            }
+            if (toDist - fromDist < 0) // zoom out
+            {
+                if (cam.fieldOfView < 60)
+                    cam.fieldOfView++;
+            }
+
+            fromFirstPos = new Vector2(t0.position.x, t0.position.y);
+            fromSecondPos = new Vector2(t1.position.x, t1.position.y);
+            fromDist = CalculateDist(ref fromFirstPos, ref fromSecondPos);
+        }
+        else if (t0.phase == TouchPhase.Ended || t1.phase == TouchPhase.Ended)
+        {
+            fromDist = 0;
+            toDist = 0;
+        }
     }
 
     void CameraRotating()
@@ -127,33 +238,13 @@ public class Main: MonoBehaviour
         if (!areSensorsChecked)
             return;
 
-        if (isGyroscope && isCompass && isAcceleration)
+        if (isGyroscope)
         {
-            CheckRotateSpeed();
+            Camera.current.transform.localRotation = new Quaternion(Input.gyro.attitude.x, Input.gyro.attitude.y, -Input.gyro.attitude.z, -Input.gyro.attitude.w);
 
-            if (!isCalibrated && isDeviceCalm)
-                Calibration();
-
-            curAngleVertical = -Input.gyro.rotationRateUnbiased.x;
-            curAngleHorizont = -Input.gyro.rotationRateUnbiased.y;
-            curAngleSpin = Input.gyro.rotationRateUnbiased.z;
-
-            player.transform.Rotate(curAngleVertical, curAngleHorizont, curAngleSpin);
-
-            curAngleVertical = player.transform.eulerAngles.x;
-            curAngleHorizont = player.transform.eulerAngles.y;
-            curAngleSpin = player.transform.eulerAngles.z;
-        }
-        else if (isGyroscope)
-        {
-            // Similar to above but with manual calibration
-
-            if (!canvasError.gameObject.activeSelf)
-            {
-                if (!isAcceleration || !isCompass)
-                    error.text = "Sorry, you have gyroscope but there is no acceleration or compass on that device.";
-                canvasError.gameObject.SetActive(true);
-            }
+            curAngleVertical = Camera.current.transform.eulerAngles.x;
+            curAngleHorizont = Camera.current.transform.eulerAngles.y;
+            curAngleSpin = Camera.current.transform.eulerAngles.z;
         }
         else if (isCompass && isAcceleration)
         {
@@ -161,14 +252,13 @@ public class Main: MonoBehaviour
             curAngleHorizont = Input.compass.magneticHeading;
             curAngleSpin = Input.acceleration.x * -90;
 
-            player.transform.rotation = Quaternion.Slerp(player.transform.rotation, Quaternion.Euler(curAngleVertical, curAngleHorizont, curAngleSpin), Time.deltaTime);
+            CameraEuler.transform.rotation = Quaternion.Slerp(Camera.current.transform.rotation, Quaternion.Euler(curAngleVertical, curAngleHorizont, curAngleSpin), Time.deltaTime);
         }
         else
         {
             if (!canvasError.gameObject.activeSelf)
             {
-                if (!isAcceleration || !isCompass)
-                    error.text = "Sorry, there is no gyroscope, acceleration or compass on that device.";
+                error.text = "Sorry, there is no gyroscope or acceleration with compass on that device.";
                 canvasError.gameObject.SetActive(true);
             }
         }
@@ -224,50 +314,32 @@ public class Main: MonoBehaviour
             return Mathf.Rad2Deg * Mathf.Atan2(s, c) + 360;
         */
     }
-
-    void CheckRotateSpeed()
+    float CalculateDist(ref Vector2 a, ref Vector2 b)
     {
-        const float maxNormalRotateSpeed = 5.0f, timeToCalmDown = 3.0f;
+        return Mathf.Sqrt((a.x - b.x)*(a.x - b.x) + (a.y - b.y)*(a.y - b.y));
+    }
 
-        if (GyroscopeRotateSpeed() > maxNormalRotateSpeed)
-        {
-            if (canvasAutocalibration.gameObject.activeSelf)
-            {
-                canvasAutocalibration.GetComponent<Animation>().Stop();
-                canvasAutocalibration.gameObject.SetActive(false);
-            }
-
-            isDeviceCalm = false;
-            isCalibrated = false;
-            timeFromEndJerky = Time.realtimeSinceStartup;
-            isDeviceJerky = true;
-        }
+    void PressEscape()
+    {
+        if (canvasOption.gameObject.activeSelf)
+            canvasOption.gameObject.SetActive(false);
+        else
+            Application.Quit();
+    }
+    void PressMenu()
+    {
+        if (canvasOption.gameObject.activeSelf)
+            canvasOption.gameObject.SetActive(false);
         else
         {
-            if (isDeviceJerky && !canvasAutocalibration.gameObject.activeSelf)
-            {
-                canvasAutocalibration.gameObject.SetActive(true);
-                canvasAutocalibration.GetComponent<Animation>().Play();
-            }
-
-            isDeviceJerky = false;
+            canvasOption.gameObject.SetActive(true);
+            canvasOption.transform.FindChild("Central").gameObject.SetActive(true);
+            canvasOption.transform.FindChild("Central").localScale = new Vector3(1, 1, 1);
+            canvasOption.transform.FindChild("Sensors").gameObject.SetActive(false);
+            canvasOption.transform.FindChild("Routers").gameObject.SetActive(false);
+            canvasOption.transform.FindChild("_1").gameObject.SetActive(false);
+            canvasOption.transform.FindChild("_2").gameObject.SetActive(false);
         }
-
-        if (!isDeviceCalm && Time.realtimeSinceStartup - timeFromEndJerky > timeToCalmDown)
-        {
-            canvasAutocalibration.GetComponent<Animation>().Stop();
-            canvasAutocalibration.gameObject.SetActive(false);
-            isDeviceCalm = true;
-        }
-    }
-    float GyroscopeRotateSpeed()
-    {
-        return Mathf.Abs(Input.gyro.rotationRateUnbiased.x) + Mathf.Abs(Input.gyro.rotationRateUnbiased.y) + Mathf.Abs(Input.gyro.rotationRateUnbiased.z);
-    }
-    void Calibration()
-    {
-        player.transform.localEulerAngles = new Vector3(Input.acceleration.z * -90, Input.compass.magneticHeading, Input.acceleration.x * -90);
-        isCalibrated = true;
     }
 
     IEnumerator ShowLogo()
@@ -284,17 +356,116 @@ public class Main: MonoBehaviour
 
         yield return new WaitForSeconds(logoTime);
         canvasLogo.gameObject.SetActive(false);
-        StopCoroutine(ShowLogo());
 
+        StopCoroutine(ShowLogo());
         yield break;
     }
-	
+    IEnumerator SwipeOptionUpFromCenter()   //Empty
+    {   
+        yield break;
+    }
+    IEnumerator SwipeOptionUpToCenter()     //Empty
+    {
+        yield break;
+    }
+    IEnumerator SwipeOptionDownFromCenter() //Empty
+    {
+        yield break;
+    }
+    IEnumerator SwipeOptionDownToCenter()   //Empty
+    {
+        yield break;
+    }
+    IEnumerator SwipeOptionToSensors()
+    {
+        isOptionAnimated = true;
+        canvasOption.transform.FindChild("Sensors").gameObject.SetActive(true);
+        canvasOption.transform.FindChild("Sensors").localScale = new Vector3(0, 1, 1);
+        canvasOption.transform.FindChild("Central").gameObject.GetComponent<RectTransform>().pivot = new Vector2(0, 0.5f);
+
+        float i = 0.0f, step = Time.deltaTime * 5;
+        while (i < 1.0f)
+        {
+            i = Mathf.Min(i + step, 1.0f);
+            canvasOption.transform.FindChild("Central").localScale = new Vector3(1 - i, 1, 1);
+            canvasOption.transform.FindChild("Sensors").localScale = new Vector3(    i, 1, 1);
+            yield return new WaitForEndOfFrame();
+        }
+        canvasOption.transform.FindChild("Central").gameObject.SetActive(false);
+        isOptionAnimated = false;
+
+        StopCoroutine(SwipeOptionToSensors());
+        yield break;
+    }
+    IEnumerator SwipeOptionFromRouters()
+    {
+        isOptionAnimated = true;
+        canvasOption.transform.FindChild("Central").gameObject.SetActive(true);
+        canvasOption.transform.FindChild("Central").gameObject.GetComponent<RectTransform>().pivot = new Vector2(1, 0.5f);
+
+        float i = 0.0f, step = Time.deltaTime * 5;
+        while (i < 1.0f)
+        {
+            i = Mathf.Min(i + step, 1.0f);
+            canvasOption.transform.FindChild("Central").localScale = new Vector3(    i, 1, 1);
+            canvasOption.transform.FindChild("Routers").localScale = new Vector3(1 - i, 1, 1);
+            yield return new WaitForEndOfFrame();
+        }
+        canvasOption.transform.FindChild("Routers").gameObject.SetActive(false);
+        isOptionAnimated = false;
+
+        StopCoroutine(SwipeOptionFromRouters());
+        yield break;
+    }
+    IEnumerator SwipeOptionToRouters()
+    {
+        isOptionAnimated = true;
+        canvasOption.transform.FindChild("Routers").gameObject.SetActive(true);
+        canvasOption.transform.FindChild("Routers").localScale = new Vector3(0, 1, 1);
+        canvasOption.transform.FindChild("Central").gameObject.GetComponent<RectTransform>().pivot = new Vector2(1, 0.5f);
+
+        float i = 0.0f, step = Time.deltaTime * 5;
+        while (i < 1.0f)
+        {
+            i = Mathf.Min(i + step, 1.0f);
+            canvasOption.transform.FindChild("Central").localScale = new Vector3(1 - i, 1, 1);
+            canvasOption.transform.FindChild("Routers").localScale = new Vector3(    i, 1, 1);
+            yield return new WaitForEndOfFrame();
+        }
+        canvasOption.transform.FindChild("Central").gameObject.SetActive(false);
+        isOptionAnimated = false;
+
+        StopCoroutine(SwipeOptionToRouters());
+        yield break;
+    }
+    IEnumerator SwipeOptionFromSensors()
+    {
+        isOptionAnimated = true;
+        canvasOption.transform.FindChild("Central").gameObject.SetActive(true);
+        canvasOption.transform.FindChild("Central").gameObject.GetComponent<RectTransform>().pivot = new Vector2(0, 0.5f);
+
+        float i = 0.0f, step = Time.deltaTime * 5;
+        while (i < 1.0f)
+        {
+            i = Mathf.Min(i + step, 1.0f);
+            canvasOption.transform.FindChild("Central").localScale = new Vector3(    i, 1, 1);
+            canvasOption.transform.FindChild("Sensors").localScale = new Vector3(1 - i, 1, 1);
+            yield return new WaitForEndOfFrame();
+        }
+        canvasOption.transform.FindChild("Sensors").gameObject.SetActive(false);
+        isOptionAnimated = false;
+
+        StopCoroutine(SwipeOptionFromSensors());
+        yield break;
+    }
+
     void CheckGyroscope()
     {
         //(Input.gyro.enabled)
 		if (Input.gyro.attitude.x + Input.gyro.attitude.y + Input.gyro.attitude.z != 0)
         {
             gyroscopeAvailable.text = "Gyroscope is available";
+            CameraEuler.transform.Rotate(90, 0, 0);
             isGyroscope = true;
         }
         else
