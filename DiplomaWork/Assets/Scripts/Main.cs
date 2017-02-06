@@ -4,8 +4,8 @@ using UnityEngine;
 
 public class Main: MonoBehaviour
 {
-    public Canvas canvasOption, canvasLogo, canvasAutocalibration, canvasError;
-    public GameObject CameraEuler;
+    public Canvas canvasOption, canvasLogo, canvasError;
+    public GameObject CameraEuler, Sun;
     public UnityEngine.UI.Text error, fps;
     public UnityEngine.UI.Text accelerationAvailable, compassAvailable, gyroscopeAvailable;
     public UnityEngine.UI.Text accelerationX, accelerationY, accelerationZ;
@@ -43,7 +43,6 @@ public class Main: MonoBehaviour
         Screen.sleepTimeout = SleepTimeout.NeverSleep;
 
         //Turn on sensors
-        Input.location.Start();
         Input.compass.enabled = true;
         Input.gyro.enabled = true;
 
@@ -52,7 +51,6 @@ public class Main: MonoBehaviour
     void Init()
     {
         canvasOption.gameObject.SetActive(false);
-        canvasAutocalibration.gameObject.SetActive(false);
         canvasError.gameObject.SetActive(false);
         StartCoroutine(ShowLogo());
     }
@@ -264,60 +262,11 @@ public class Main: MonoBehaviour
         }
     }
 
-    float QueueMedian(ref Queue<float> q)
-    {
-        float s = 0;
-        foreach (float i in q)
-            s += i;
-        return s / q.Count;
-    }
-    float QueuePolarMedian(ref Queue<float> q)
-    {
-        bool more_300 = false, less_60 = false;
-        float s = 0;
-        foreach (float i in q)
-        {
-            s += i;
-            if (i > 300)
-                more_300 = true;
-            if (i < 60)
-                less_60 = true;
-        }
-
-        if (more_300 && less_60)
-        {
-            s = 0;
-            foreach (float i in q)
-            {
-                s += i;
-                if (i < 300)
-                    s += 360;
-            }
-            return s / q.Count % 360;
-        }
-        else
-            return s / q.Count;
-
-
-        /*
-        SLOW but work
-
-        float s = 0, c = 0;
-        foreach (float i in q)
-        {
-            s += Mathf.Sin(i * Mathf.Deg2Rad);
-            c += Mathf.Cos(i * Mathf.Deg2Rad);
-        }
-        if (s > 0)
-            return Mathf.Rad2Deg * Mathf.Atan2(s, c);
-        else
-            return Mathf.Rad2Deg * Mathf.Atan2(s, c) + 360;
-        */
-    }
+    //distance for swipe identification
     float CalculateDist(ref Vector2 a, ref Vector2 b)
     {
         return Mathf.Sqrt((a.x - b.x)*(a.x - b.x) + (a.y - b.y)*(a.y - b.y));
-    }
+    } 
 
     void PressEscape()
     {
@@ -337,8 +286,8 @@ public class Main: MonoBehaviour
             canvasOption.transform.FindChild("Central").localScale = new Vector3(1, 1, 1);
             canvasOption.transform.FindChild("Sensors").gameObject.SetActive(false);
             canvasOption.transform.FindChild("Routers").gameObject.SetActive(false);
-            canvasOption.transform.FindChild("_1").gameObject.SetActive(false);
-            canvasOption.transform.FindChild("_2").gameObject.SetActive(false);
+            canvasOption.transform.FindChild("GPS").gameObject.SetActive(false);
+            canvasOption.transform.FindChild("Options").gameObject.SetActive(false);
         }
     }
 
