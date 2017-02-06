@@ -405,14 +405,4 @@ public class Dungeon : MonoBehaviour
     {
         return (Math.Abs(from.x - to.x) + Math.Abs(from.y - to.y));
     }
-
-    void Start()
-    {
-
-    }
-
-    void Update()
-    {
-
-    }
 }

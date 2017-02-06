@@ -33,13 +33,13 @@ public class RotatePoint : MonoBehaviour
                     transform.Translate(Vector3.forward * SceneOptions.GetTile());
                     break;
                 case 'a':
-                    transform.Translate(Vector3.left * SceneOptions.GetTile());
+                    transform.Translate(Vector3.left    * SceneOptions.GetTile());
                     break;
                 case 's':
-                    transform.Translate(Vector3.back * SceneOptions.GetTile());
+                    transform.Translate(Vector3.back    * SceneOptions.GetTile());
                     break;
                 case 'd':
-                    transform.Translate(Vector3.right * SceneOptions.GetTile());
+                    transform.Translate(Vector3.right   * SceneOptions.GetTile());
                     break;
             }
 

@@ -22,7 +22,7 @@ public class Player : MonoBehaviour
             if ( SceneOptions.IsButtonQE(false) && RotatePoint.IsWaiting() )
             {
                 f_angle += Time.deltaTime * SceneOptions.GetPlayerRotateSpeed();
-                Transform rotateTarget  = RotatePoint.GetTransform();           //TODO Можно уменьшить количество действий на одно за весь поворот
+                Transform rotateTarget  = RotatePoint.GetTransform();
                 transform.rotation = Quaternion.RotateTowards(transform.rotation, rotateTarget.rotation, Time.deltaTime * SceneOptions.GetPlayerRotateSpeed());
             }
 
@@ -30,7 +30,7 @@ public class Player : MonoBehaviour
             if ( SceneOptions.IsButtonWASD() && WayPoint.IsWaiting())
             {
                 f_step += Time.deltaTime * SceneOptions.GetPlayerMoveSpeed();
-                Transform moveTarget = WayPoint.GetTransform();                 //TODO Можно уменьшить количество действий на одно за весь поворот
+                Transform moveTarget = WayPoint.GetTransform();
                 transform.position = Vector3.MoveTowards(transform.position, moveTarget.position, Time.deltaTime * SceneOptions.GetPlayerMoveSpeed());
             }
         }

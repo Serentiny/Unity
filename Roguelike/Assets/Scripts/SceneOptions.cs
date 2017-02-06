@@ -57,34 +57,44 @@ public class SceneOptions : MonoBehaviour {
 
     public void PressQ()
     {
-        c_move = 'q';
-        Player.rot_dir = (Player.rot_dir - 1) % 4;
+        if (c_move == '-')
+        {
+            c_move = 'q';
+            Player.rot_dir = (Player.rot_dir - 1) % 4;
+        }
     }
 
     public void PressW()
     {
-        c_move = 'w';
+        if (c_move == '-')
+            c_move = 'w';
     }
 
     public void PressE()
     {
-        c_move = 'e';
-        Player.rot_dir = (Player.rot_dir + 1) % 4;
+        if (c_move == '-')
+        {
+            c_move = 'e';
+            Player.rot_dir = (Player.rot_dir + 1) % 4;
+        }
     }
 
     public void PressA()
     {
-        c_move = 'a';
+        if (c_move == '-')
+            c_move = 'a';
     }
 
     public void PressS()
     {
-        c_move = 's';
+        if (c_move == '-')
+            c_move = 's';
     }
 
     public void PressD()
     {
-        c_move = 'd';
+        if (c_move == '-')
+            c_move = 'd';
     }
 
     public static void ReleaseButton()
@@ -123,9 +133,9 @@ public class SceneOptions : MonoBehaviour {
             else if (Input.GetKeyDown("down"))
                 c_move = 's';
             else if(Input.GetKeyDown("left"))
-                c_move = 'a';
+                c_move = 'q';
             else if(Input.GetKeyDown("right"))
-                c_move = 'd';
+                c_move = 'e';
         return (Input.GetKeyDown("up") || Input.GetKeyDown("down") || Input.GetKeyDown("left") || Input.GetKeyDown("right")) ? true : false;
     }
 
