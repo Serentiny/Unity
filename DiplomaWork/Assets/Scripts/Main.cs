@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -12,6 +13,9 @@ public class Main: MonoBehaviour
     public UnityEngine.UI.Text compassRawX, compassRawY, compassRawZ, compassAngle;
     public UnityEngine.UI.Text gyroAttitudeX, gyroAttitudeY, gyroAttitudeZ, gyroAttitudeW, gyroRotUnbiasX, gyroRotUnbiasY, gyroRotUnbiasZ;
     public UnityEngine.UI.Text verticalAngle, horizontAngle, spinAngle;
+    public UnityEngine.UI.Text gpsLatitude, gpsLongtitude, gpsAltitude, gpsHorisAccuracy, gpsTimestamp, gpsError;
+    public UnityEngine.UI.Text wifiError;
+    public UnityEngine.UI.Button gpsButton, wifiButton;
 
     // Flags for working with rotating
     bool isGyroscope = false, isCompass = false, isAcceleration = false, areSensorsChecked = false;
@@ -52,6 +56,7 @@ public class Main: MonoBehaviour
     {
         canvasOption.gameObject.SetActive(false);
         canvasError.gameObject.SetActive(false);
+        Sun.SetActive(false);
         StartCoroutine(ShowLogo());
     }
 
@@ -96,26 +101,28 @@ public class Main: MonoBehaviour
         {
             switch (swipeDirection)
             {
-                case Swipe.Up:
+                case Swipe.Up:  //move to the bottom
                     if (canvasOption.transform.FindChild("Central").gameObject.activeSelf)
-                        StartCoroutine(SwipeOptionUpFromCenter());
+                        StartCoroutine(SwipeOptionToOptions());
                     else
-                        StartCoroutine(SwipeOptionUpToCenter());
+                    if (canvasOption.transform.FindChild("GPS").gameObject.activeSelf)
+                        StartCoroutine(SwipeOptionFromGPS());
                     break;
-                case Swipe.Down:
+                case Swipe.Down:  //move to upper
                     if (canvasOption.transform.FindChild("Central").gameObject.activeSelf)
-                        StartCoroutine(SwipeOptionDownFromCenter());
+                        StartCoroutine(SwipeOptionToGPS());
                     else
-                        StartCoroutine(SwipeOptionDownToCenter());
+                    if (canvasOption.transform.FindChild("Options").gameObject.activeSelf)
+                        StartCoroutine(SwipeOptionFromOptions());
                     break;
-                case Swipe.Left:
+                case Swipe.Left:  //move to the right
                     if (canvasOption.transform.FindChild("Central").gameObject.activeSelf)
                         StartCoroutine(SwipeOptionToSensors());
                     else
                     if (canvasOption.transform.FindChild("Routers").gameObject.activeSelf)
                         StartCoroutine(SwipeOptionFromRouters());
                     break;
-                case Swipe.Right:
+                case Swipe.Right:  //move to the left
                     if (canvasOption.transform.FindChild("Central").gameObject.activeSelf)
                         StartCoroutine(SwipeOptionToRouters());
                     else
@@ -309,20 +316,164 @@ public class Main: MonoBehaviour
         StopCoroutine(ShowLogo());
         yield break;
     }
-    IEnumerator SwipeOptionUpFromCenter()   //Empty
-    {   
+    IEnumerator CheckGPSLocation()
+    {
+        //if (!Input.location.isEnabledByUser)
+        //{
+        //    gpsError.text = "Please, turn on GPS manualy";
+        //    gpsCheckButton.enabled = true;
+        //    yield break;
+        //}
+
+        // Start service before querying location
+        Input.location.Start();
+
+        // Wait until service initializes
+        int maxWait = 20;
+        while (Input.location.status == LocationServiceStatus.Initializing && maxWait > 0)
+        {
+            yield return new WaitForSeconds(1);
+            maxWait--;
+            gpsError.text += ".";
+        }
+
+        // Service didn't initialize in 20 seconds
+        if (maxWait < 1)
+            gpsError.text = "Timed out";
+        else if (Input.location.status == LocationServiceStatus.Failed)
+        {
+            gpsError.text = "Unable to determine device location";
+        }
+        else
+        {
+            // Access granted and location value could be retrieved
+            gpsLatitude.text = "Latitude = " + Input.location.lastData.latitude;
+            gpsLongtitude.text = "Longtitude = " + Input.location.lastData.longitude;
+            gpsAltitude.text = "Altitude = " + Input.location.lastData.altitude;
+            gpsHorisAccuracy.text = "HorizontalAccuracy = " + Input.location.lastData.horizontalAccuracy;
+            gpsTimestamp.text = "Timestamp = " + Input.location.lastData.timestamp;
+            gpsError.text = "";
+        }
+
+        // Stop service if there is no need to query location updates continuously
+        Input.location.Stop();
+        gpsButton.enabled = true;
         yield break;
     }
-    IEnumerator SwipeOptionUpToCenter()     //Empty
+    IEnumerator CheckWiFiRouters()
     {
+        using (AndroidJavaObject activity = new AndroidJavaClass("com.unity3d.player.UnityPlayer").GetStatic<AndroidJavaObject>("currentActivity"))
+        {
+            using (var wifiManager = activity.Call<AndroidJavaObject>("getSystemService", "wifi"))
+            {
+                try
+                {
+                    var enabled = wifiManager.Call<Boolean>("isWifiEnabled");
+                    if (!enabled)
+                        wifiError.text = "WiFi is Off; \n";
+                    else
+                    {
+                        var scanlist = wifiManager.Call<AndroidJavaObject>("getScanResults");
+                        var size       = scanlist.Call<int>("size");
+                        for (int i = 0; i < size; i++)
+                        {
+                            var scanResult = scanlist.Call<AndroidJavaObject>("get", i);
+                            var SSID = scanResult.Get<String>("SSID");
+                            var rssi = scanResult.Get<int>("level");
+
+                            wifiError.text += SSID + " " + rssi + "dBm\n";
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    wifiError.text += e.ToString();
+                }
+            }
+        }
         yield break;
     }
-    IEnumerator SwipeOptionDownFromCenter() //Empty
+
+    IEnumerator SwipeOptionToOptions()
     {
+        isOptionAnimated = true;
+        canvasOption.transform.FindChild("Options").gameObject.SetActive(true);
+        canvasOption.transform.FindChild("Options").localScale = new Vector3(1, 0, 1);
+        canvasOption.transform.FindChild("Central").gameObject.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 1);
+
+        float i = 0.0f, step = Time.deltaTime * 5;
+        while (i < 1.0f)
+        {
+            i = Mathf.Min(i + step, 1.0f);
+            canvasOption.transform.FindChild("Central").localScale = new Vector3(1, 1 - i, 1);
+            canvasOption.transform.FindChild("Options").localScale = new Vector3(1, i, 1);
+            yield return new WaitForEndOfFrame();
+        }
+        canvasOption.transform.FindChild("Central").gameObject.SetActive(false);
+        isOptionAnimated = false;
+
+        StopCoroutine(SwipeOptionToOptions());
         yield break;
     }
-    IEnumerator SwipeOptionDownToCenter()   //Empty
+    IEnumerator SwipeOptionFromGPS()
     {
+        isOptionAnimated = true;
+        canvasOption.transform.FindChild("Central").gameObject.SetActive(true);
+        canvasOption.transform.FindChild("Central").gameObject.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 0);
+
+        float i = 0.0f, step = Time.deltaTime * 5;
+        while (i < 1.0f)
+        {
+            i = Mathf.Min(i + step, 1.0f);
+            canvasOption.transform.FindChild("Central").localScale = new Vector3(1, i, 1);
+            canvasOption.transform.FindChild("GPS").localScale = new Vector3(1, 1 - i, 1);
+            yield return new WaitForEndOfFrame();
+        }
+        canvasOption.transform.FindChild("GPS").gameObject.SetActive(false);
+        isOptionAnimated = false;
+
+        StopCoroutine(SwipeOptionFromGPS());
+        yield break;
+    }
+    IEnumerator SwipeOptionToGPS()
+    {
+        isOptionAnimated = true;
+        canvasOption.transform.FindChild("GPS").gameObject.SetActive(true);
+        canvasOption.transform.FindChild("GPS").localScale = new Vector3(1, 0, 1);
+        canvasOption.transform.FindChild("Central").gameObject.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 0);
+
+        float i = 0.0f, step = Time.deltaTime * 5;
+        while (i < 1.0f)
+        {
+            i = Mathf.Min(i + step, 1.0f);
+            canvasOption.transform.FindChild("Central").localScale = new Vector3(1, 1 - i, 1);
+            canvasOption.transform.FindChild("GPS").localScale = new Vector3(1, i, 1);
+            yield return new WaitForEndOfFrame();
+        }
+        canvasOption.transform.FindChild("Central").gameObject.SetActive(false);
+        isOptionAnimated = false;
+
+        StopCoroutine(SwipeOptionToGPS());
+        yield break;
+    }
+    IEnumerator SwipeOptionFromOptions()
+    {
+        isOptionAnimated = true;
+        canvasOption.transform.FindChild("Central").gameObject.SetActive(true);
+        canvasOption.transform.FindChild("Central").gameObject.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 1);
+
+        float i = 0.0f, step = Time.deltaTime * 5;
+        while (i < 1.0f)
+        {
+            i = Mathf.Min(i + step, 1.0f);
+            canvasOption.transform.FindChild("Central").localScale = new Vector3(1,     i, 1);
+            canvasOption.transform.FindChild("Options").localScale = new Vector3(1, 1 - i, 1);
+            yield return new WaitForEndOfFrame();
+        }
+        canvasOption.transform.FindChild("Options").gameObject.SetActive(false);
+        isOptionAnimated = false;
+
+        StopCoroutine(SwipeOptionFromOptions());
         yield break;
     }
     IEnumerator SwipeOptionToSensors()
@@ -450,6 +601,22 @@ public class Main: MonoBehaviour
             isAcceleration = false;
         }
 
+    }
+
+    public void CheckGPS()
+    {
+        gpsButton.enabled = false;
+        gpsError.text = "Please wait a moment";
+        StartCoroutine(CheckGPSLocation());
+    }
+    public void CheckWiFi()
+    {
+        wifiError.text = "";
+        StartCoroutine(CheckWiFiRouters());
+    }
+    public void ToggleSun(bool _this)
+    {
+        Sun.SetActive(!Sun.activeSelf);
     }
 }
 
