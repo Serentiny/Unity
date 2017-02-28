@@ -1,21 +1,22 @@
 ﻿using System;
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class Main: MonoBehaviour
 {
-    public Canvas canvasOption, canvasLogo, canvasError;
-    public GameObject CameraEuler, Sun;
-    public UnityEngine.UI.Text error, fps;
-    public UnityEngine.UI.Text accelerationAvailable, compassAvailable, gyroscopeAvailable;
-    public UnityEngine.UI.Text accelerationX, accelerationY, accelerationZ;
-    public UnityEngine.UI.Text compassRawX, compassRawY, compassRawZ, compassAngle;
-    public UnityEngine.UI.Text gyroAttitudeX, gyroAttitudeY, gyroAttitudeZ, gyroAttitudeW, gyroRotUnbiasX, gyroRotUnbiasY, gyroRotUnbiasZ;
-    public UnityEngine.UI.Text verticalAngle, horizontAngle, spinAngle;
-    public UnityEngine.UI.Text gpsLatitude, gpsLongtitude, gpsAltitude, gpsHorisAccuracy, gpsTimestamp, gpsError;
-    public UnityEngine.UI.Text wifiError;
-    public UnityEngine.UI.Button gpsButton, wifiButton;
+    public Canvas canvasOption, canvasLogo, canvasError, canvasMoving;
+    public GameObject Sun, Player;
+    public Slider correctionSlider;
+    public Text error, fps;
+    public Text accelerationAvailable, compassAvailable, gyroscopeAvailable;
+    public Text accelerationX, accelerationY, accelerationZ;
+    public Text compassRawX, compassRawY, compassRawZ, compassAngle;
+    public Text gyroAttitudeX, gyroAttitudeY, gyroAttitudeZ, gyroAttitudeW, gyroRotUnbiasX, gyroRotUnbiasY, gyroRotUnbiasZ;
+    public Text verticalAngle, horizontAngle, spinAngle;
+    public Text gpsLatitude, gpsLongtitude, gpsAltitude, gpsHorisAccuracy, gpsTimestamp, gpsError;
+    public Text wifiError;
+    public Button gpsButton, wifiButton;
 
     // Flags for working with rotating
     bool isGyroscope = false, isCompass = false, isAcceleration = false, areSensorsChecked = false;
@@ -36,9 +37,12 @@ public class Main: MonoBehaviour
     // Current angles of camera
     float curAngleHorizont = 0.0f, curAngleVertical = 0.0f, curAngleSpin = 0.0f;
 
+    bool wifiLoopCheck = false;
+    
     // Constant variables
     const float maxTimeToDoubleTap = 0.25f, minSwipeDist = 5.0f, maxNormalRotateSpeed = 5.0f;
     const int doubleTap = 2;
+    Rigidbody rb;
     //==================================================================================================================================================================================
 
     void Start()
@@ -49,6 +53,9 @@ public class Main: MonoBehaviour
         //Turn on sensors
         Input.compass.enabled = true;
         Input.gyro.enabled = true;
+        
+        //add listener to correction slider
+        correctionSlider.onValueChanged.AddListener(delegate { HorizontCorrectionChange(); });
 
         Init();
     }
@@ -56,6 +63,8 @@ public class Main: MonoBehaviour
     {
         canvasOption.gameObject.SetActive(false);
         canvasError.gameObject.SetActive(false);
+        canvasMoving.gameObject.SetActive(false);
+
         Sun.SetActive(false);
         StartCoroutine(ShowLogo());
     }
@@ -93,6 +102,10 @@ public class Main: MonoBehaviour
             if (Input.touchCount == 2)
                 TwoFingersZoom();
         }
+
+        //Moving by joystick
+        if (canvasMoving.gameObject.activeSelf)
+            JoystickMoving();
     }
     
     void OptionUpdate()
@@ -215,7 +228,7 @@ public class Main: MonoBehaviour
             toSecondPos = new Vector2(t1.position.x, t1.position.y);
             toDist = CalculateDist(ref toFirstPos, ref toSecondPos);
 
-            Camera cam = Camera.current;
+            Camera cam = Camera.main;
             if (toDist - fromDist > 0) // zoom in
             {
                 if (cam.fieldOfView > 20)
@@ -223,7 +236,7 @@ public class Main: MonoBehaviour
             }
             if (toDist - fromDist < 0) // zoom out
             {
-                if (cam.fieldOfView < 60)
+                if (cam.fieldOfView < 50)
                     cam.fieldOfView++;
             }
 
@@ -237,6 +250,17 @@ public class Main: MonoBehaviour
             toDist = 0;
         }
     }
+    void JoystickMoving()
+    {
+        var inputVector = new Vector3(CnControls.CnInputManager.GetAxis("Horizontal"), 0f, CnControls.CnInputManager.GetAxis("Vertical"));
+
+        // If we have some input
+        if (inputVector.sqrMagnitude > 0.001f)
+        {
+            rb.AddForce(inputVector.z * Camera.main.transform.forward, ForceMode.Impulse);
+            rb.AddForce(inputVector.x * Camera.main.transform.right  , ForceMode.Impulse);
+        }
+    }
 
     void CameraRotating()
     {
@@ -245,19 +269,19 @@ public class Main: MonoBehaviour
 
         if (isGyroscope)
         {
-            Camera.current.transform.localRotation = new Quaternion(Input.gyro.attitude.x, Input.gyro.attitude.y, -Input.gyro.attitude.z, -Input.gyro.attitude.w);
+            Camera.main.transform.localRotation = new Quaternion(Input.gyro.attitude.x, Input.gyro.attitude.y, -Input.gyro.attitude.z, -Input.gyro.attitude.w);
 
-            curAngleVertical = Camera.current.transform.eulerAngles.x;
-            curAngleHorizont = Camera.current.transform.eulerAngles.y;
-            curAngleSpin = Camera.current.transform.eulerAngles.z;
+            curAngleVertical = Camera.main.transform.eulerAngles.x;
+            curAngleHorizont = Camera.main.transform.eulerAngles.y;
+            curAngleSpin = Camera.main.transform.eulerAngles.z;
         }
         else if (isCompass && isAcceleration)
         {
             curAngleVertical = Input.acceleration.z * -90;
             curAngleHorizont = Input.compass.magneticHeading;
             curAngleSpin = Input.acceleration.x * -90;
-
-            CameraEuler.transform.rotation = Quaternion.Slerp(Camera.current.transform.rotation, Quaternion.Euler(curAngleVertical, curAngleHorizont, curAngleSpin), Time.deltaTime);
+            
+            Camera.main.transform.localRotation = Quaternion.Slerp(Camera.main.transform.rotation, Quaternion.Euler(curAngleVertical, curAngleHorizont, curAngleSpin), Time.deltaTime);
         }
         else
         {
@@ -308,7 +332,11 @@ public class Main: MonoBehaviour
         CheckGyroscope();
         CheckCompass();
         CheckAcceleration();
+
+        if (isGyroscope)
+            Player.transform.Rotate(90, 0, 0);
         areSensorsChecked = true;
+        rb = Player.GetComponent<Rigidbody>();
 
         yield return new WaitForSeconds(logoTime);
         canvasLogo.gameObject.SetActive(false);
@@ -362,36 +390,54 @@ public class Main: MonoBehaviour
     }
     IEnumerator CheckWiFiRouters()
     {
-        using (AndroidJavaObject activity = new AndroidJavaClass("com.unity3d.player.UnityPlayer").GetStatic<AndroidJavaObject>("currentActivity"))
+        while (wifiLoopCheck)
         {
-            using (var wifiManager = activity.Call<AndroidJavaObject>("getSystemService", "wifi"))
+            using (AndroidJavaObject activity = new AndroidJavaClass("com.unity3d.player.UnityPlayer").GetStatic<AndroidJavaObject>("currentActivity"))
             {
-                try
+                using (var wifiManager = activity.Call<AndroidJavaObject>("getSystemService", "wifi"))
                 {
-                    var enabled = wifiManager.Call<Boolean>("isWifiEnabled");
-                    if (!enabled)
-                        wifiError.text = "WiFi is Off; \n";
-                    else
+                    try
                     {
-                        var scanlist = wifiManager.Call<AndroidJavaObject>("getScanResults");
-                        var size       = scanlist.Call<int>("size");
-                        for (int i = 0; i < size; i++)
+                        var enabled = wifiManager.Call<Boolean>("isWifiEnabled");
+                        if (!enabled)
                         {
-                            var scanResult = scanlist.Call<AndroidJavaObject>("get", i);
-                            var SSID = scanResult.Get<String>("SSID");
-                            var rssi = scanResult.Get<int>("level");
+                            wifiError.text = "WiFi is Off; \n";
+                            wifiButton.transform.FindChild("Text").GetComponent<Text>().text = "Start WiFi scaning";
+                            wifiLoopCheck = false;
+                        }
+                        else
+                        {
+                            wifiError.text = "";
+                            var scanlist = wifiManager.Call<AndroidJavaObject>("getScanResults");
+                            var size = scanlist.Call<int>("size");
+                            for (int i = 0; i < size; i++)
+                            {
+                                var scanResult = scanlist.Call<AndroidJavaObject>("get", i);
+                                var SSID = scanResult.Get<String>("SSID");
+                                var rssi = scanResult.Get<int>("level");
+                                var freq = scanResult.Get<int>("frequency");
 
-                            wifiError.text += SSID + " " + rssi + "dBm\n";
+                                double exp = (27.55 - (20 * Math.Log10(freq)) + Math.Abs(rssi)) / 20.0;
+                                double dist = Math.Pow(10.0, exp);
+
+                                wifiError.text += "'" + SSID + "' " + dist.ToString("F3") + "m.\n";
+                            }
                         }
                     }
-                }
-                catch (Exception e)
-                {
-                    wifiError.text += e.ToString();
+                    catch (Exception e)
+                    {
+                        wifiError.color = Color.red;
+                        wifiError.text = e.ToString();
+                    }
                 }
             }
+            if (!wifiButton.interactable)
+                wifiButton.interactable = true;
+            yield return new WaitForEndOfFrame();
         }
-        yield break;
+        yield return new WaitForSeconds(2);
+        wifiButton.interactable = true;
+        wifiError.text = "";
     }
 
     IEnumerator SwipeOptionToOptions()
@@ -565,7 +611,6 @@ public class Main: MonoBehaviour
 		if (Input.gyro.attitude.x + Input.gyro.attitude.y + Input.gyro.attitude.z != 0)
         {
             gyroscopeAvailable.text = "Gyroscope is available";
-            CameraEuler.transform.Rotate(90, 0, 0);
             isGyroscope = true;
         }
         else
@@ -602,6 +647,11 @@ public class Main: MonoBehaviour
         }
 
     }
+    
+    void HorizontCorrectionChange()
+    {
+        Player.transform.rotation = Quaternion.Euler(Player.transform.rotation.eulerAngles.x, correctionSlider.value, Player.transform.rotation.eulerAngles.z);
+    }
 
     public void CheckGPS()
     {
@@ -611,30 +661,25 @@ public class Main: MonoBehaviour
     }
     public void CheckWiFi()
     {
-        wifiError.text = "";
-        StartCoroutine(CheckWiFiRouters());
+        wifiButton.interactable = false;
+        if (wifiLoopCheck)
+        {
+            wifiButton.transform.FindChild("Text").GetComponent<Text>().text = "Start WiFi scaning";
+            wifiLoopCheck = false;
+        }
+        else
+        {
+            wifiButton.transform.FindChild("Text").GetComponent<Text>().text = "Stop WiFi scaninig";
+            wifiLoopCheck = true;
+            StartCoroutine(CheckWiFiRouters());
+        }
     }
     public void ToggleSun(bool _this)
     {
         Sun.SetActive(!Sun.activeSelf);
     }
-}
-
-/*
-    float LowPassFilter(float h, float raw)
+    public void ToggleMoving(bool _this)
     {
-        float filteredValue = 0;
-        float tau = 1;  // filter's time constant - lower = faster reponse + weaker noise suppresion, higher = slower, smoother response
-        int iteration = 0;
- 
-        if (iteration == 0) // if it's the first iteration
-            filteredValue = raw; // just initate filteredValue
-        else
-        {
-            float alpha = Mathf.Exp(-h / tau); // calculate alfa value based on time step and filter's time constant
-            filteredValue = alpha * filteredValue + (1 - alpha) * raw; // calculate new filteredValue from previous value and new raw value
-        }
-        iteration++; // increment iteration number
-        return filteredValue;
+        canvasMoving.gameObject.SetActive(!canvasMoving.gameObject.activeSelf);
     }
-*/
+}

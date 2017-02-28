@@ -1,7 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2015
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DiplomaWork.Plugins", "DiplomaWork.Plugins.csproj", "{2C60C6C0-B6A9-957D-1B3A-C07052DF6763}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DiplomaWork", "DiplomaWork.csproj", "{3F390912-4DDD-FE10-68D0-A3A0DB59A795}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DiplomaWork.Editor.Plugins", "DiplomaWork.Editor.Plugins.csproj", "{F2BF9260-1C89-8A7A-FB69-A5A06468EFF2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -9,10 +13,18 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2C60C6C0-B6A9-957D-1B3A-C07052DF6763}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2C60C6C0-B6A9-957D-1B3A-C07052DF6763}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2C60C6C0-B6A9-957D-1B3A-C07052DF6763}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2C60C6C0-B6A9-957D-1B3A-C07052DF6763}.Release|Any CPU.Build.0 = Release|Any CPU
 		{3F390912-4DDD-FE10-68D0-A3A0DB59A795}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{3F390912-4DDD-FE10-68D0-A3A0DB59A795}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3F390912-4DDD-FE10-68D0-A3A0DB59A795}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3F390912-4DDD-FE10-68D0-A3A0DB59A795}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F2BF9260-1C89-8A7A-FB69-A5A06468EFF2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F2BF9260-1C89-8A7A-FB69-A5A06468EFF2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F2BF9260-1C89-8A7A-FB69-A5A06468EFF2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F2BF9260-1C89-8A7A-FB69-A5A06468EFF2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
