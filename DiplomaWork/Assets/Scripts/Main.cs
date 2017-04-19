@@ -1,22 +1,63 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using NativeWifi;
+
+public struct listRouterInfo
+{
+    double dist;
+    string ssid;
+
+    public listRouterInfo(double _dist, string _ssid)
+    {
+        dist = _dist;
+        ssid = _ssid;
+    }
+
+    public double GetDist()
+    {
+        return dist;
+    }
+
+    public string GetSsid()
+    {
+        return ssid;
+    }
+}
+public struct cornerRouterInfo
+{
+    int cornerNo;
+    string ssid;
+
+    public cornerRouterInfo(int _cornerNo, string _ssid)
+    {
+        cornerNo = _cornerNo;
+        ssid = _ssid;
+    }
+
+    public int GetCornerNo()
+    {
+        return cornerNo;
+    }
+
+    public string GetSsid()
+    {
+        return ssid;
+    }
+}
 
 public class Main: MonoBehaviour
 {
-    public Canvas canvasOption, canvasLogo, canvasError, canvasMoving;
-    public GameObject Sun, Player;
+    public Canvas canvasOption, canvasLogo, canvasError, canvasJoystick;
+    public GameObject Sun, Player, wifiSprite;
     public Slider correctionSlider;
+    public Toggle Move, JMove, RMove;
     public Text error, fps;
-    public Text accelerationAvailable, compassAvailable, gyroscopeAvailable;
-    public Text accelerationX, accelerationY, accelerationZ;
-    public Text compassRawX, compassRawY, compassRawZ, compassAngle;
-    public Text gyroAttitudeX, gyroAttitudeY, gyroAttitudeZ, gyroAttitudeW, gyroRotUnbiasX, gyroRotUnbiasY, gyroRotUnbiasZ;
-    public Text verticalAngle, horizontAngle, spinAngle;
     public Text gpsLatitude, gpsLongtitude, gpsAltitude, gpsHorisAccuracy, gpsTimestamp, gpsError;
-    public Text wifiError;
-    public Button gpsButton, wifiButton;
+    public Text wifiScanText, wifiCalibrateText, rMoveOutput;
+    public Button gpsButton, wifiScanButton, wifiCalibrateButton, wifiSetButton, wifiNextButton;
 
     // Flags for working with rotating
     bool isGyroscope = false, isCompass = false, isAcceleration = false, areSensorsChecked = false;
@@ -36,17 +77,27 @@ public class Main: MonoBehaviour
 
     // Current angles of camera
     float curAngleHorizont = 0.0f, curAngleVertical = 0.0f, curAngleSpin = 0.0f;
+    Rigidbody rb;
 
+    // Working with routers
     bool wifiLoopCheck = false;
-    
+    Dictionary<string, listRouterInfo> wifiList = new Dictionary<String, listRouterInfo>();
+    int cornerNo = 0;
+    Dictionary<string, cornerRouterInfo> listCornerRouters = new Dictionary<string, cornerRouterInfo>();
+    float kX, kZ;
+    List<float> listKX, listKZ;
+
     // Constant variables
     const float maxTimeToDoubleTap = 0.25f, minSwipeDist = 5.0f, maxNormalRotateSpeed = 5.0f;
     const int doubleTap = 2;
-    Rigidbody rb;
+    const double cornerDist = 0.5f;
+    const float zDist = 14, xDist = 8;
+    string os;
     //==================================================================================================================================================================================
 
     void Start()
     {
+        os = Environment.OSVersion.Platform.ToString().Substring(0, 3);
         //Never turn off the screen
         Screen.sleepTimeout = SleepTimeout.NeverSleep;
 
@@ -63,7 +114,15 @@ public class Main: MonoBehaviour
     {
         canvasOption.gameObject.SetActive(false);
         canvasError.gameObject.SetActive(false);
-        canvasMoving.gameObject.SetActive(false);
+        canvasJoystick.gameObject.SetActive(false);
+        JMove.gameObject.SetActive(false);
+        JMove.isOn = false;
+        RMove.gameObject.SetActive(false);
+        RMove.isOn = false;
+        wifiCalibrateButton.interactable = false;
+        wifiSetButton.gameObject.SetActive(false);
+        wifiNextButton.gameObject.SetActive(false);
+        wifiSprite.gameObject.SetActive(false);
 
         Sun.SetActive(false);
         StartCoroutine(ShowLogo());
@@ -104,7 +163,7 @@ public class Main: MonoBehaviour
         }
 
         //Moving by joystick
-        if (canvasMoving.gameObject.activeSelf)
+        if (canvasJoystick.gameObject.activeSelf)
             JoystickMoving();
     }
     
@@ -115,63 +174,63 @@ public class Main: MonoBehaviour
             switch (swipeDirection)
             {
                 case Swipe.Up:  //move to the bottom
-                    if (canvasOption.transform.FindChild("Central").gameObject.activeSelf)
+                    if (canvasOption.transform.Find("Central").gameObject.activeSelf)
                         StartCoroutine(SwipeOptionToOptions());
                     else
-                    if (canvasOption.transform.FindChild("GPS").gameObject.activeSelf)
+                    if (canvasOption.transform.Find("GPS").gameObject.activeSelf)
                         StartCoroutine(SwipeOptionFromGPS());
                     break;
                 case Swipe.Down:  //move to upper
-                    if (canvasOption.transform.FindChild("Central").gameObject.activeSelf)
+                    if (canvasOption.transform.Find("Central").gameObject.activeSelf)
                         StartCoroutine(SwipeOptionToGPS());
                     else
-                    if (canvasOption.transform.FindChild("Options").gameObject.activeSelf)
+                    if (canvasOption.transform.Find("Options").gameObject.activeSelf)
                         StartCoroutine(SwipeOptionFromOptions());
                     break;
                 case Swipe.Left:  //move to the right
-                    if (canvasOption.transform.FindChild("Central").gameObject.activeSelf)
+                    if (canvasOption.transform.Find("Central").gameObject.activeSelf)
                         StartCoroutine(SwipeOptionToSensors());
                     else
-                    if (canvasOption.transform.FindChild("Routers").gameObject.activeSelf)
+                    if (canvasOption.transform.Find("Routers").gameObject.activeSelf)
                         StartCoroutine(SwipeOptionFromRouters());
                     break;
                 case Swipe.Right:  //move to the left
-                    if (canvasOption.transform.FindChild("Central").gameObject.activeSelf)
+                    if (canvasOption.transform.Find("Central").gameObject.activeSelf)
                         StartCoroutine(SwipeOptionToRouters());
                     else
-                    if (canvasOption.transform.FindChild("Sensors").gameObject.activeSelf)
+                    if (canvasOption.transform.Find("Sensors").gameObject.activeSelf)
                         StartCoroutine(SwipeOptionFromSensors());
                     break;
             }
         }
 
-        if (canvasOption.transform.FindChild("Central").gameObject.activeSelf)
+        if (canvasOption.transform.Find("Central").gameObject.activeSelf)
             fps.text = (1.0f / fpsDeltaTime).ToString("00.0") + " FPS";
-        if (canvasOption.transform.FindChild("Sensors").gameObject.activeSelf)
+        if (canvasOption.transform.Find("Sensors").gameObject.activeSelf)
             OptionSensorsUpdate();
     }
     void OptionSensorsUpdate()
     {
-        accelerationX.text = "Acceleration.X = " + Input.acceleration.x.ToString(" 0.000;-0.000");
-        accelerationY.text = "Acceleration.Y = " + Input.acceleration.y.ToString(" 0.000;-0.000");
-        accelerationZ.text = "Acceleration.Z = " + Input.acceleration.z.ToString(" 0.000;-0.000");
+        canvasOption.transform.Find("Sensors/Acceleration/X").GetComponent<Text>().text = "Acceleration.X = " + Input.acceleration.x.ToString(" 0.000;-0.000");
+        canvasOption.transform.Find("Sensors/Acceleration/Y").GetComponent<Text>().text = "Acceleration.Y = " + Input.acceleration.y.ToString(" 0.000;-0.000");
+        canvasOption.transform.Find("Sensors/Acceleration/Z").GetComponent<Text>().text = "Acceleration.Z = " + Input.acceleration.z.ToString(" 0.000;-0.000");
 
-        compassRawX.text  = "RawVector.X = " + Input.compass.rawVector.x.ToString(" 000;-000");
-        compassRawY.text  = "RawVector.Y = " + Input.compass.rawVector.y.ToString(" 000;-000");
-        compassRawZ.text  = "RawVector.Z = " + Input.compass.rawVector.z.ToString(" 000;-000");
-        compassAngle.text = "MagnetHeading = " + Input.compass.magneticHeading.ToString(" 000.00");
+        canvasOption.transform.Find("Sensors/Compass/Raw.X").GetComponent<Text>().text         = "RawVector.X = "   + Input.compass.rawVector.x.ToString(" 000;-000");
+        canvasOption.transform.Find("Sensors/Compass/Raw.Y").GetComponent<Text>().text         = "RawVector.Y = "   + Input.compass.rawVector.y.ToString(" 000;-000");
+        canvasOption.transform.Find("Sensors/Compass/Raw.Z").GetComponent<Text>().text         = "RawVector.Z = "   + Input.compass.rawVector.z.ToString(" 000;-000");
+        canvasOption.transform.Find("Sensors/Compass/MagnetHeading").GetComponent<Text>().text = "MagnetHeading = " + Input.compass.magneticHeading.ToString(" 000.00");
 
-        gyroAttitudeX.text  = "Attitude.X = " + Input.gyro.attitude.x.ToString(" 00.000;-00.000");
-        gyroAttitudeY.text  = "Attitude.Y = " + Input.gyro.attitude.y.ToString(" 00.000;-00.000");
-        gyroAttitudeZ.text  = "Attitude.Z = " + Input.gyro.attitude.z.ToString(" 00.000;-00.000");
-        gyroAttitudeW.text  = "Attitude.W = " + Input.gyro.attitude.w.ToString(" 00.000;-00.000");
-        gyroRotUnbiasX.text = "RotationRateUnbiased.X = " + Input.gyro.rotationRateUnbiased.x.ToString(" 00.000;-00.000");
-        gyroRotUnbiasY.text = "RotationRateUnbiased.Y = " + Input.gyro.rotationRateUnbiased.y.ToString(" 00.000;-00.000");
-        gyroRotUnbiasZ.text = "RotationRateUnbiased.Z = " + Input.gyro.rotationRateUnbiased.z.ToString(" 00.000;-00.000");
+        canvasOption.transform.Find("Sensors/Gyroscope/Attitude.X").GetComponent<Text>().text  = "Attitude.X = " + Input.gyro.attitude.x.ToString(" 00.000;-00.000");
+        canvasOption.transform.Find("Sensors/Gyroscope/Attitude.Y").GetComponent<Text>().text  = "Attitude.Y = " + Input.gyro.attitude.y.ToString(" 00.000;-00.000");
+        canvasOption.transform.Find("Sensors/Gyroscope/Attitude.Z").GetComponent<Text>().text  = "Attitude.Z = " + Input.gyro.attitude.z.ToString(" 00.000;-00.000");
+        canvasOption.transform.Find("Sensors/Gyroscope/Attitude.W").GetComponent<Text>().text  = "Attitude.W = " + Input.gyro.attitude.w.ToString(" 00.000;-00.000");
+        canvasOption.transform.Find("Sensors/Gyroscope/RotationRateUnbiased.X").GetComponent<Text>().text = "RotationRateUnbiased.X = " + Input.gyro.rotationRateUnbiased.x.ToString(" 00.000;-00.000");
+        canvasOption.transform.Find("Sensors/Gyroscope/RotationRateUnbiased.Y").GetComponent<Text>().text = "RotationRateUnbiased.Y = " + Input.gyro.rotationRateUnbiased.y.ToString(" 00.000;-00.000");
+        canvasOption.transform.Find("Sensors/Gyroscope/RotationRateUnbiased.Z").GetComponent<Text>().text = "RotationRateUnbiased.Z = " + Input.gyro.rotationRateUnbiased.z.ToString(" 00.000;-00.000");
 
-        verticalAngle.text = "Vertical = " + curAngleVertical.ToString(" 000.00;-000.00");
-        horizontAngle.text = "Horizont = " + curAngleHorizont.ToString(" 000.00;-000.00");
-        spinAngle.text     = "Spin = "     + curAngleSpin.ToString(" 000.00;-000.00");
+        canvasOption.transform.Find("Sensors/RealCoord/CurrentAngle.X").GetComponent<Text>().text = "Vertical = " + curAngleVertical.ToString(" 000.00;-000.00");
+        canvasOption.transform.Find("Sensors/RealCoord/CurrentAngle.Y").GetComponent<Text>().text = "Horizont = " + curAngleHorizont.ToString(" 000.00;-000.00");
+        canvasOption.transform.Find("Sensors/RealCoord/CurrentAngle.Z").GetComponent<Text>().text     = "Spin = "     + curAngleSpin.ToString(" 000.00;-000.00");
     }
 
     void CheckSwipeAndTap()
@@ -313,13 +372,215 @@ public class Main: MonoBehaviour
         else
         {
             canvasOption.gameObject.SetActive(true);
-            canvasOption.transform.FindChild("Central").gameObject.SetActive(true);
-            canvasOption.transform.FindChild("Central").localScale = new Vector3(1, 1, 1);
-            canvasOption.transform.FindChild("Sensors").gameObject.SetActive(false);
-            canvasOption.transform.FindChild("Routers").gameObject.SetActive(false);
-            canvasOption.transform.FindChild("GPS").gameObject.SetActive(false);
-            canvasOption.transform.FindChild("Options").gameObject.SetActive(false);
+            canvasOption.transform.Find("Central").gameObject.SetActive(true);
+            canvasOption.transform.Find("Central").localScale = new Vector3(1, 1, 1);
+            canvasOption.transform.Find("Sensors").gameObject.SetActive(false);
+            canvasOption.transform.Find("Routers").gameObject.SetActive(false);
+            canvasOption.transform.Find("GPS").gameObject.SetActive(false);
+            canvasOption.transform.Find("Options").gameObject.SetActive(false);
         }
+    }
+
+    void CheckGyroscope()
+    {
+        //(Input.gyro.enabled)
+		if (Input.gyro.attitude.x + Input.gyro.attitude.y + Input.gyro.attitude.z != 0)
+        {
+            canvasOption.transform.Find("Sensors/Availability/Gyroscope").GetComponent<Text>().text = "Gyroscope is available";
+            isGyroscope = true;
+        }
+        else
+        {
+            canvasOption.transform.Find("Sensors/Availability/Gyroscope").GetComponent<Text>().text = "Gyroscope is NOT available";
+            isGyroscope = false;
+        }
+    }
+    void CheckCompass()
+    {
+        //if (Input.compass.enabled)
+		if (Input.compass.rawVector.x + Input.compass.rawVector.y + Input.compass.rawVector.z != 0)
+        {
+            canvasOption.transform.Find("Sensors/Availability/Compass").GetComponent<Text>().text = "Compass is available";
+            isCompass = true;
+        }
+        else
+        {
+            canvasOption.transform.Find("Sensors/Availability/Compass").GetComponent<Text>().text = "Compass is NOT available";
+            isCompass = false;
+        }
+    }
+    void CheckAcceleration()
+    {
+        if (Input.acceleration.x + Input.acceleration.y + Input.acceleration.z != 0)
+        {
+            canvasOption.transform.Find("Sensors/Availability/Acceleration").GetComponent<Text>().text = "Acceleration is available";
+            isAcceleration = true;
+        }
+        else
+        {
+            canvasOption.transform.Find("Sensors/Availability/Acceleration").GetComponent<Text>().text = "Acceleration is NOT available";
+            isAcceleration = false;
+        }
+
+    }
+    
+    void HorizontCorrectionChange()
+    {
+        Player.transform.rotation = Quaternion.Euler(Player.transform.rotation.eulerAngles.x, correctionSlider.value, Player.transform.rotation.eulerAngles.z);
+    }
+
+    bool TryGetSSIDByCornerNo(ref Dictionary<string, cornerRouterInfo> dict, int value, out List<string> ssids)
+    {
+        ssids = new List<string>();
+        ssids.Clear();
+        foreach (var record in dict)
+        {
+            if (record.Value.GetCornerNo().Equals(value))
+                ssids.Add(record.Value.GetSsid());
+        }
+        if (ssids.Count != 0)
+            return true;
+        return false;
+    }
+    bool TryGetBSSIDByCornerNo(ref Dictionary<string, cornerRouterInfo> dict, int value, out List<string> bssids)
+    {
+        bssids = new List<string>();
+        bssids.Clear();
+        foreach (var record in dict)
+        {
+            if (record.Value.GetCornerNo().Equals(value))
+                bssids.Add(record.Key);
+        }
+        if (bssids.Count != 0)
+            return true;
+        return false;
+    }
+
+    public void CheckGPS()
+    {
+        gpsButton.enabled = false;
+        gpsError.text = "Please wait a moment";
+        StartCoroutine(CheckGPSLocation());
+    }
+    public void CheckWiFi()
+    {
+        wifiScanButton.interactable = false;
+        if (wifiLoopCheck)
+        {
+            wifiScanButton.transform.Find("Text").GetComponent<Text>().text = "Start WiFi scaning";
+            wifiLoopCheck = false;
+            wifiCalibrateButton.interactable = false;
+        }
+        else
+        {
+            wifiScanButton.transform.Find("Text").GetComponent<Text>().text = "Stop WiFi scaninig";
+            wifiLoopCheck = true;
+            wifiCalibrateButton.interactable = true;
+            StartCoroutine(CheckWiFiRouters());
+        }
+    }
+    public void CalibrateWiFi()
+    {
+        wifiCalibrateButton.gameObject.SetActive(false);
+        wifiScanButton.interactable = false;
+        wifiSetButton.gameObject.SetActive(true);
+        wifiNextButton.gameObject.SetActive(true);
+        StartCoroutine(CalibrateWiFiRouters());
+    }
+    public void AddWiFiRouter()
+    {                        
+        foreach (var router in wifiList)
+        {
+            if (router.Value.GetDist() < cornerDist)
+            {
+                if (listCornerRouters.ContainsKey(router.Key))
+                    listCornerRouters[router.Key] = new cornerRouterInfo(cornerNo, router.Value.GetSsid());
+                else
+                    listCornerRouters.Add(router.Key, new cornerRouterInfo(cornerNo, router.Value.GetSsid()));
+            }
+        }
+
+        List<string> list;
+        wifiCalibrateText.text = "Routers in corner #" + (cornerNo + 1).ToString() + ":\n";
+        if (TryGetSSIDByCornerNo(ref listCornerRouters, cornerNo, out list))
+            foreach (var router in list)
+                wifiCalibrateText.text += "  '" + router + "'\n";
+
+        List<string> listBssid;
+        switch (cornerNo)           //подсчет коэффициентов пропорций реальной и виртуальной комнат
+        {
+            case 1:
+                if (TryGetBSSIDByCornerNo(ref listCornerRouters, 0, out listBssid))
+                    foreach (var bssid in listBssid)
+                        if (wifiList.ContainsKey(bssid))
+                            listKZ.Add((float)wifiList[bssid].GetDist());
+                break;
+            case 2:
+                if (TryGetBSSIDByCornerNo(ref listCornerRouters, 1, out listBssid))
+                    foreach (var bssid in listBssid)
+                        if (wifiList.ContainsKey(bssid))
+                            listKX.Add((float)wifiList[bssid].GetDist());
+                break;
+            case 3:
+                if (TryGetBSSIDByCornerNo(ref listCornerRouters, 2, out listBssid))
+                    foreach (var bssid in listBssid)
+                        if (wifiList.ContainsKey(bssid))
+                            listKZ.Add((float)wifiList[bssid].GetDist());
+                if (TryGetBSSIDByCornerNo(ref listCornerRouters, 0, out listBssid))
+                    foreach (var bssid in listBssid)
+                        if (wifiList.ContainsKey(bssid))
+                            listKX.Add((float)wifiList[bssid].GetDist());
+                break;
+            default:
+                break;
+        }
+    }
+    public void NextWiFiRouter()
+    {
+        cornerNo++;
+        if (cornerNo < 4)
+            wifiCalibrateText.text = "Routers in corner #" + (cornerNo + 1).ToString() + ":\n";
+
+        switch (cornerNo)
+        {
+            case 1:
+                wifiSprite.transform.position = new Vector3(-3.5f, 1.5f, 6.5f);
+                break;
+            case 2:
+                wifiSprite.transform.position = new Vector3(3.5f, 1.5f, 6.5f);
+                break;
+            case 3:
+                wifiSprite.transform.position = new Vector3(3.5f, 1.5f, -6.5f);
+                break;
+            default:
+                wifiSprite.gameObject.SetActive(false);
+                break; 
+        }
+    }
+
+    public void ToggleSun(bool _this)
+    {
+        Sun.SetActive(!Sun.activeSelf);
+    }
+    public void ToggleMoving(bool _this)
+    {
+        JMove.gameObject.SetActive(Move.isOn);
+        RMove.gameObject.SetActive(Move.isOn);
+        JMove.isOn = JMove.gameObject.activeSelf ? true : false;
+        RMove.isOn = false;
+    }
+    public void ToggleJMoving(bool _this)
+    {
+        if (Move.isOn)
+            RMove.isOn = !JMove.isOn;
+        canvasJoystick.gameObject.SetActive(JMove.isOn);
+    }
+    public void ToggleRMoving(bool _this)
+    {
+        if (Move.isOn)
+            JMove.isOn = !RMove.isOn;
+        if (RMove.isOn)
+            StartCoroutine(RMoving());
     }
 
     IEnumerator ShowLogo()
@@ -390,72 +651,188 @@ public class Main: MonoBehaviour
     }
     IEnumerator CheckWiFiRouters()
     {
+        wifiScanText.color = Color.black;
         while (wifiLoopCheck)
         {
-            using (AndroidJavaObject activity = new AndroidJavaClass("com.unity3d.player.UnityPlayer").GetStatic<AndroidJavaObject>("currentActivity"))
+            if (!os.Equals("Win"))
             {
-                using (var wifiManager = activity.Call<AndroidJavaObject>("getSystemService", "wifi"))
+                // ANDROID
+                using (AndroidJavaObject activity = new AndroidJavaClass("com.unity3d.player.UnityPlayer").GetStatic<AndroidJavaObject>("currentActivity"))
                 {
-                    try
+                    using (var wifiManager = activity.Call<AndroidJavaObject>("getSystemService", "wifi"))
                     {
-                        var enabled = wifiManager.Call<Boolean>("isWifiEnabled");
-                        if (!enabled)
+                        try
                         {
-                            wifiError.text = "WiFi is Off; \n";
-                            wifiButton.transform.FindChild("Text").GetComponent<Text>().text = "Start WiFi scaning";
-                            wifiLoopCheck = false;
-                        }
-                        else
-                        {
-                            wifiError.text = "";
-                            var scanlist = wifiManager.Call<AndroidJavaObject>("getScanResults");
-                            var size = scanlist.Call<int>("size");
-                            for (int i = 0; i < size; i++)
+                            var enabled = wifiManager.Call<Boolean>("isWifiEnabled");
+                            if (!enabled)
                             {
-                                var scanResult = scanlist.Call<AndroidJavaObject>("get", i);
-                                var SSID = scanResult.Get<String>("SSID");
-                                var rssi = scanResult.Get<int>("level");
-                                var freq = scanResult.Get<int>("frequency");
+                                wifiScanText.text = "WiFi is Off; \n";
+                                wifiScanButton.transform.Find("Text").GetComponent<Text>().text = "Start WiFi scaning";
+                                wifiLoopCheck = false;
+                                wifiCalibrateButton.interactable = false;
+                            }
+                            else
+                            {
+                                wifiScanText.text = "";
+                                if (!wifiManager.Call<bool>("startScan"))
+                                    continue;
 
-                                double exp = (27.55 - (20 * Math.Log10(freq)) + Math.Abs(rssi)) / 20.0;
-                                double dist = Math.Pow(10.0, exp);
+                                var scanlist = wifiManager.Call<AndroidJavaObject>("getScanResults");
+                                var size = scanlist.Call<int>("size");
+                                for (int i = 0; i < size; i++)
+                                {
+                                    var scanResult = scanlist.Call<AndroidJavaObject>("get", i);
+                                    var BSSID = scanResult.Get<String>("BSSID");
+                                    var SSID = scanResult.Get<String>("SSID");
+                                    var rssi = scanResult.Get<int>("level");
+                                    var freq = scanResult.Get<int>("frequency");
 
-                                wifiError.text += "'" + SSID + "' " + dist.ToString("F3") + "m.\n";
+                                    double exp = (27.55 - (20 * Math.Log10(freq)) + Math.Abs(rssi)) / 20.0;
+                                    double dist = Math.Pow(10.0, exp);
+
+                                    if (wifiList.ContainsKey(BSSID))
+                                        wifiList[BSSID] = new listRouterInfo(dist, SSID);
+                                    else
+                                        wifiList.Add(BSSID, new listRouterInfo(dist, SSID));
+
+                                    wifiScanText.text += "'" + SSID + "' " + dist.ToString("F3") + "m.\n";
+                                }
                             }
                         }
-                    }
-                    catch (Exception e)
-                    {
-                        wifiError.color = Color.red;
-                        wifiError.text = e.ToString();
+                        catch (Exception e)
+                        {
+                            wifiScanText.color = Color.red;
+                            wifiScanText.text = e.ToString();
+                        }
                     }
                 }
+                yield return new WaitForEndOfFrame();
+                // ANDROID
             }
-            if (!wifiButton.interactable)
-                wifiButton.interactable = true;
-            yield return new WaitForEndOfFrame();
+            else
+            {
+                // WINDOWS
+                WlanClient client;
+                try
+                {
+                    client = new WlanClient();
+                }
+                catch (Exception)
+                {
+                    continue;
+                }
+
+                foreach (WlanClient.WlanInterface wlanIface in client.Interfaces)
+                {                    
+                    try
+                    {
+                        wlanIface.Scan();
+                    }
+                    catch (Exception)
+                    {
+                        break;
+                    }
+
+
+                    yield return new WaitForSeconds(1);
+                    
+                    bool needToCleanOutput = true;
+                    Wlan.WlanBssEntry[] wlanBssEntries1 = wlanIface.GetNetworkBssList();
+                    foreach (Wlan.WlanBssEntry network in wlanBssEntries1)
+                    {
+                        if (needToCleanOutput)
+                        {
+                            wifiScanText.text = "";
+                            needToCleanOutput = false;
+                        }
+                        var BSSID = System.Text.Encoding.ASCII.GetString(network.dot11Bssid).Trim((char)0);
+                        var SSID = System.Text.Encoding.ASCII.GetString(network.dot11Ssid.SSID).Trim((char)0);
+                        var rssi = network.rssi;
+                        var freq = network.chCenterFrequency / 1000;
+
+                        double exp = (27.55 - (20 * Math.Log10(freq)) + Math.Abs(rssi)) / 20.0;
+                        double dist = Math.Pow(10.0, exp);
+
+                        if (wifiList.ContainsKey(BSSID))
+                            wifiList[BSSID] = new listRouterInfo(dist, SSID);
+                        else
+                            wifiList.Add(BSSID, new listRouterInfo(dist, SSID));
+
+                        wifiScanText.text += "'" + SSID + "' " + dist.ToString("F3") + "m.\n";
+                    }
+                }
+                // WINDOWS
+            }
+
+            if (!wifiScanButton.interactable)
+                wifiScanButton.interactable = true;
         }
         yield return new WaitForSeconds(2);
-        wifiButton.interactable = true;
-        wifiError.text = "";
+        wifiScanButton.interactable = true;
+        wifiScanText.text = "";
+    }
+    IEnumerator CalibrateWiFiRouters()
+    {
+        listKX = new List<float>();
+        listKZ = new List<float>();
+        kX = 0;
+        kZ = 0;
+        listCornerRouters.Clear();
+        cornerNo = 0;
+        wifiSprite.gameObject.SetActive(true);
+        wifiSprite.transform.position = new Vector3(-3.5f, 1.5f, -6.5f);
+        wifiCalibrateText.text = "Routers in corner #" + (cornerNo + 1).ToString() + ":\n";
+
+        while (cornerNo < 4)
+        {
+            wifiSprite.transform.LookAt(Player.transform);
+            yield return new WaitForEndOfFrame();
+        }
+
+        List<string> listSsid;
+        wifiCalibrateText.text = "";
+        for (int i = 0; i < 4; i++)
+        {
+            wifiCalibrateText.text += "Routers in corner #" + (i + 1).ToString() + ":\n";
+            if (TryGetSSIDByCornerNo(ref listCornerRouters, i, out listSsid))
+                foreach (var router in listSsid)
+                    wifiCalibrateText.text += "  '" + router + "'\n";
+        }
+
+        foreach (var f in listKX)
+            kX += f;
+        if (listKX.Count > 0)
+            kX = kX / listKX.Count / xDist;
+        foreach (var f in listKZ)
+            kZ += f;
+        if (listKZ.Count > 0)
+            kZ = kZ / listKZ.Count / zDist;
+        wifiCalibrateText.text += "kX = " + kX + "; kZ = " + kZ + ";\n";
+
+        wifiCalibrateButton.gameObject.SetActive(true);
+        wifiScanButton.interactable = true;
+        wifiSetButton.gameObject.SetActive(false);
+        wifiNextButton.gameObject.SetActive(false);
+        StopCoroutine(CalibrateWiFiRouters());
+        yield break;
     }
 
     IEnumerator SwipeOptionToOptions()
     {
         isOptionAnimated = true;
-        canvasOption.transform.FindChild("Options").gameObject.SetActive(true);
-        canvasOption.transform.FindChild("Options").localScale = new Vector3(1, 0, 1);
-        canvasOption.transform.FindChild("Central").gameObject.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 1);
+        canvasOption.transform.Find("Options").gameObject.SetActive(true);
+        canvasOption.transform.Find("Options").localScale = new Vector3(1, 0, 1);
+        canvasOption.transform.Find("Central").gameObject.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 1);
 
         float i = 0.0f, step = Time.deltaTime * 5;
         while (i < 1.0f)
         {
             i = Mathf.Min(i + step, 1.0f);
-            canvasOption.transform.FindChild("Central").localScale = new Vector3(1, 1 - i, 1);
-            canvasOption.transform.FindChild("Options").localScale = new Vector3(1, i, 1);
+            canvasOption.transform.Find("Central").localScale = new Vector3(1, 1 - i, 1);
+            canvasOption.transform.Find("Options").localScale = new Vector3(1, i, 1);
             yield return new WaitForEndOfFrame();
         }
-        canvasOption.transform.FindChild("Central").gameObject.SetActive(false);
+        canvasOption.transform.Find("Central").gameObject.SetActive(false);
         isOptionAnimated = false;
 
         StopCoroutine(SwipeOptionToOptions());
@@ -464,18 +841,18 @@ public class Main: MonoBehaviour
     IEnumerator SwipeOptionFromGPS()
     {
         isOptionAnimated = true;
-        canvasOption.transform.FindChild("Central").gameObject.SetActive(true);
-        canvasOption.transform.FindChild("Central").gameObject.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 0);
+        canvasOption.transform.Find("Central").gameObject.SetActive(true);
+        canvasOption.transform.Find("Central").gameObject.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 0);
 
         float i = 0.0f, step = Time.deltaTime * 5;
         while (i < 1.0f)
         {
             i = Mathf.Min(i + step, 1.0f);
-            canvasOption.transform.FindChild("Central").localScale = new Vector3(1, i, 1);
-            canvasOption.transform.FindChild("GPS").localScale = new Vector3(1, 1 - i, 1);
+            canvasOption.transform.Find("Central").localScale = new Vector3(1, i, 1);
+            canvasOption.transform.Find("GPS").localScale = new Vector3(1, 1 - i, 1);
             yield return new WaitForEndOfFrame();
         }
-        canvasOption.transform.FindChild("GPS").gameObject.SetActive(false);
+        canvasOption.transform.Find("GPS").gameObject.SetActive(false);
         isOptionAnimated = false;
 
         StopCoroutine(SwipeOptionFromGPS());
@@ -484,19 +861,19 @@ public class Main: MonoBehaviour
     IEnumerator SwipeOptionToGPS()
     {
         isOptionAnimated = true;
-        canvasOption.transform.FindChild("GPS").gameObject.SetActive(true);
-        canvasOption.transform.FindChild("GPS").localScale = new Vector3(1, 0, 1);
-        canvasOption.transform.FindChild("Central").gameObject.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 0);
+        canvasOption.transform.Find("GPS").gameObject.SetActive(true);
+        canvasOption.transform.Find("GPS").localScale = new Vector3(1, 0, 1);
+        canvasOption.transform.Find("Central").gameObject.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 0);
 
         float i = 0.0f, step = Time.deltaTime * 5;
         while (i < 1.0f)
         {
             i = Mathf.Min(i + step, 1.0f);
-            canvasOption.transform.FindChild("Central").localScale = new Vector3(1, 1 - i, 1);
-            canvasOption.transform.FindChild("GPS").localScale = new Vector3(1, i, 1);
+            canvasOption.transform.Find("Central").localScale = new Vector3(1, 1 - i, 1);
+            canvasOption.transform.Find("GPS").localScale = new Vector3(1, i, 1);
             yield return new WaitForEndOfFrame();
         }
-        canvasOption.transform.FindChild("Central").gameObject.SetActive(false);
+        canvasOption.transform.Find("Central").gameObject.SetActive(false);
         isOptionAnimated = false;
 
         StopCoroutine(SwipeOptionToGPS());
@@ -505,18 +882,18 @@ public class Main: MonoBehaviour
     IEnumerator SwipeOptionFromOptions()
     {
         isOptionAnimated = true;
-        canvasOption.transform.FindChild("Central").gameObject.SetActive(true);
-        canvasOption.transform.FindChild("Central").gameObject.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 1);
+        canvasOption.transform.Find("Central").gameObject.SetActive(true);
+        canvasOption.transform.Find("Central").gameObject.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 1);
 
         float i = 0.0f, step = Time.deltaTime * 5;
         while (i < 1.0f)
         {
             i = Mathf.Min(i + step, 1.0f);
-            canvasOption.transform.FindChild("Central").localScale = new Vector3(1,     i, 1);
-            canvasOption.transform.FindChild("Options").localScale = new Vector3(1, 1 - i, 1);
+            canvasOption.transform.Find("Central").localScale = new Vector3(1,     i, 1);
+            canvasOption.transform.Find("Options").localScale = new Vector3(1, 1 - i, 1);
             yield return new WaitForEndOfFrame();
         }
-        canvasOption.transform.FindChild("Options").gameObject.SetActive(false);
+        canvasOption.transform.Find("Options").gameObject.SetActive(false);
         isOptionAnimated = false;
 
         StopCoroutine(SwipeOptionFromOptions());
@@ -525,19 +902,19 @@ public class Main: MonoBehaviour
     IEnumerator SwipeOptionToSensors()
     {
         isOptionAnimated = true;
-        canvasOption.transform.FindChild("Sensors").gameObject.SetActive(true);
-        canvasOption.transform.FindChild("Sensors").localScale = new Vector3(0, 1, 1);
-        canvasOption.transform.FindChild("Central").gameObject.GetComponent<RectTransform>().pivot = new Vector2(0, 0.5f);
+        canvasOption.transform.Find("Sensors").gameObject.SetActive(true);
+        canvasOption.transform.Find("Sensors").localScale = new Vector3(0, 1, 1);
+        canvasOption.transform.Find("Central").gameObject.GetComponent<RectTransform>().pivot = new Vector2(0, 0.5f);
 
         float i = 0.0f, step = Time.deltaTime * 5;
         while (i < 1.0f)
         {
             i = Mathf.Min(i + step, 1.0f);
-            canvasOption.transform.FindChild("Central").localScale = new Vector3(1 - i, 1, 1);
-            canvasOption.transform.FindChild("Sensors").localScale = new Vector3(    i, 1, 1);
+            canvasOption.transform.Find("Central").localScale = new Vector3(1 - i, 1, 1);
+            canvasOption.transform.Find("Sensors").localScale = new Vector3(    i, 1, 1);
             yield return new WaitForEndOfFrame();
         }
-        canvasOption.transform.FindChild("Central").gameObject.SetActive(false);
+        canvasOption.transform.Find("Central").gameObject.SetActive(false);
         isOptionAnimated = false;
 
         StopCoroutine(SwipeOptionToSensors());
@@ -546,18 +923,18 @@ public class Main: MonoBehaviour
     IEnumerator SwipeOptionFromRouters()
     {
         isOptionAnimated = true;
-        canvasOption.transform.FindChild("Central").gameObject.SetActive(true);
-        canvasOption.transform.FindChild("Central").gameObject.GetComponent<RectTransform>().pivot = new Vector2(1, 0.5f);
+        canvasOption.transform.Find("Central").gameObject.SetActive(true);
+        canvasOption.transform.Find("Central").gameObject.GetComponent<RectTransform>().pivot = new Vector2(1, 0.5f);
 
         float i = 0.0f, step = Time.deltaTime * 5;
         while (i < 1.0f)
         {
             i = Mathf.Min(i + step, 1.0f);
-            canvasOption.transform.FindChild("Central").localScale = new Vector3(    i, 1, 1);
-            canvasOption.transform.FindChild("Routers").localScale = new Vector3(1 - i, 1, 1);
+            canvasOption.transform.Find("Central").localScale = new Vector3(    i, 1, 1);
+            canvasOption.transform.Find("Routers").localScale = new Vector3(1 - i, 1, 1);
             yield return new WaitForEndOfFrame();
         }
-        canvasOption.transform.FindChild("Routers").gameObject.SetActive(false);
+        canvasOption.transform.Find("Routers").gameObject.SetActive(false);
         isOptionAnimated = false;
 
         StopCoroutine(SwipeOptionFromRouters());
@@ -566,19 +943,19 @@ public class Main: MonoBehaviour
     IEnumerator SwipeOptionToRouters()
     {
         isOptionAnimated = true;
-        canvasOption.transform.FindChild("Routers").gameObject.SetActive(true);
-        canvasOption.transform.FindChild("Routers").localScale = new Vector3(0, 1, 1);
-        canvasOption.transform.FindChild("Central").gameObject.GetComponent<RectTransform>().pivot = new Vector2(1, 0.5f);
+        canvasOption.transform.Find("Routers").gameObject.SetActive(true);
+        canvasOption.transform.Find("Routers").localScale = new Vector3(0, 1, 1);
+        canvasOption.transform.Find("Central").gameObject.GetComponent<RectTransform>().pivot = new Vector2(1, 0.5f);
 
         float i = 0.0f, step = Time.deltaTime * 5;
         while (i < 1.0f)
         {
             i = Mathf.Min(i + step, 1.0f);
-            canvasOption.transform.FindChild("Central").localScale = new Vector3(1 - i, 1, 1);
-            canvasOption.transform.FindChild("Routers").localScale = new Vector3(    i, 1, 1);
+            canvasOption.transform.Find("Central").localScale = new Vector3(1 - i, 1, 1);
+            canvasOption.transform.Find("Routers").localScale = new Vector3(    i, 1, 1);
             yield return new WaitForEndOfFrame();
         }
-        canvasOption.transform.FindChild("Central").gameObject.SetActive(false);
+        canvasOption.transform.Find("Central").gameObject.SetActive(false);
         isOptionAnimated = false;
 
         StopCoroutine(SwipeOptionToRouters());
@@ -587,99 +964,91 @@ public class Main: MonoBehaviour
     IEnumerator SwipeOptionFromSensors()
     {
         isOptionAnimated = true;
-        canvasOption.transform.FindChild("Central").gameObject.SetActive(true);
-        canvasOption.transform.FindChild("Central").gameObject.GetComponent<RectTransform>().pivot = new Vector2(0, 0.5f);
+        canvasOption.transform.Find("Central").gameObject.SetActive(true);
+        canvasOption.transform.Find("Central").gameObject.GetComponent<RectTransform>().pivot = new Vector2(0, 0.5f);
 
         float i = 0.0f, step = Time.deltaTime * 5;
         while (i < 1.0f)
         {
             i = Mathf.Min(i + step, 1.0f);
-            canvasOption.transform.FindChild("Central").localScale = new Vector3(    i, 1, 1);
-            canvasOption.transform.FindChild("Sensors").localScale = new Vector3(1 - i, 1, 1);
+            canvasOption.transform.Find("Central").localScale = new Vector3(    i, 1, 1);
+            canvasOption.transform.Find("Sensors").localScale = new Vector3(1 - i, 1, 1);
             yield return new WaitForEndOfFrame();
         }
-        canvasOption.transform.FindChild("Sensors").gameObject.SetActive(false);
+        canvasOption.transform.Find("Sensors").gameObject.SetActive(false);
         isOptionAnimated = false;
 
         StopCoroutine(SwipeOptionFromSensors());
         yield break;
     }
+    IEnumerator RMoving()
+    {
+        List<float> wfDist = new List<float>();
+        for (int i = 0; i < 4; i++)
+            wfDist.Add(0);
+        float newXPos = 0, newZPos = 0;
 
-    void CheckGyroscope()
-    {
-        //(Input.gyro.enabled)
-		if (Input.gyro.attitude.x + Input.gyro.attitude.y + Input.gyro.attitude.z != 0)
+        while (RMove.isOn)
         {
-            gyroscopeAvailable.text = "Gyroscope is available";
-            isGyroscope = true;
-        }
-        else
-        {
-            gyroscopeAvailable.text = "Gyroscope is NOT available";
-            isGyroscope = false;
-        }
-    }
-    void CheckCompass()
-    {
-        //if (Input.compass.enabled)
-		if (Input.compass.rawVector.x + Input.compass.rawVector.y + Input.compass.rawVector.z != 0)
-        {
-            compassAvailable.text = "Compass is available";
-            isCompass = true;
-        }
-        else
-        {
-            compassAvailable.text = "Compass is NOT available";
-            isCompass = false;
-        }
-    }
-    void CheckAcceleration()
-    {
-        if (Input.acceleration.x + Input.acceleration.y + Input.acceleration.z != 0)
-        {
-            accelerationAvailable.text = "Acceleration is available";
-            isAcceleration = true;
-        }
-        else
-        {
-            accelerationAvailable.text = "Acceleration is NOT available";
-            isAcceleration = false;
-        }
+            for (int i = 0; i < 4; i++)
+            {
+                List<string> routers;                                                       // Для каждого угла
+                if (TryGetBSSIDByCornerNo(ref listCornerRouters, i, out routers))           // Достаем все его роутеры
+                {
+                    int count = 0;
+                    float dist = 0;
+                    foreach (var bssid in routers)                                          // И для каждого роутера
+                        if (wifiList.ContainsKey(bssid))
+                        {
+                            dist += (float)wifiList[bssid].GetDist();                       // Достаем расстояние от него
+                            count++;
+                        }
+                    if (count > 0)                                                          // После чего усредняем по всем роутерам в сети
+                        wfDist[i] = dist / count;
+                }
+                else
+                {
+                    JMove.isOn = true;
+                    break;                                                                  // А если хотя бы одного роутера в углу нет - это косяк
+                }
+            }
 
-    }
-    
-    void HorizontCorrectionChange()
-    {
-        Player.transform.rotation = Quaternion.Euler(Player.transform.rotation.eulerAngles.x, correctionSlider.value, Player.transform.rotation.eulerAngles.z);
-    }
+            if (JMove.isOn)
+            {
+                ToggleJMoving(true);
+                break;
+            }
 
-    public void CheckGPS()
-    {
-        gpsButton.enabled = false;
-        gpsError.text = "Please wait a moment";
-        StartCoroutine(CheckGPSLocation());
-    }
-    public void CheckWiFi()
-    {
-        wifiButton.interactable = false;
-        if (wifiLoopCheck)
-        {
-            wifiButton.transform.FindChild("Text").GetComponent<Text>().text = "Start WiFi scaning";
-            wifiLoopCheck = false;
+            // Делаем четыре трилатерации а итог усредняем
+            rMoveOutput.text = "kX = " + kX + "; kZ = " + kZ + ";\n";
+            rMoveOutput.text += "wfDist[0] = " + wfDist[0] + ";\n wfDist[1] = " + wfDist[1] + ";\n";
+            rMoveOutput.text += "wfDist[2] = " + wfDist[2] + ";\n wfDist[3] = " + wfDist[3] + ";\n";
+            // 1
+            float x0 =  (wfDist[0] * wfDist[0] - wfDist[3] * wfDist[3]) / (2 * xDist * kX * kX);
+            float z0 =  (wfDist[0] * wfDist[0] - wfDist[1] * wfDist[1]) / (2 * zDist * kZ * kZ);
+            // 2
+            float x1 =  (wfDist[1] * wfDist[1] - wfDist[2] * wfDist[2]) / (2 * xDist * kX * kX);
+            float z1 = -(wfDist[1] * wfDist[1] - wfDist[0] * wfDist[0]) / (2 * zDist * kZ * kZ);
+            // 3
+            float x2 = -(wfDist[2] * wfDist[2] - wfDist[1] * wfDist[1]) / (2 * xDist * kX * kX);
+            float z2 = -(wfDist[2] * wfDist[2] - wfDist[3] * wfDist[3]) / (2 * zDist * kZ * kZ);
+            // 4
+            float x3 = -(wfDist[3] * wfDist[3] - wfDist[0] * wfDist[0]) / (2 * xDist * kX * kX);
+            float z3 =  (wfDist[3] * wfDist[3] - wfDist[2] * wfDist[2]) / (2 * zDist * kZ * kZ);
+
+            newXPos = Math.Min(Math.Max((x0 + x1 + x2 + x3) / 4, -4), 4);
+            newZPos = Math.Min(Math.Max((z0 + z1 + z2 + z3) / 4, -8), 8);
+
+            rMoveOutput.text += "x0 = " + x0 + ";\n x1 = " + x1 + ";\n x2 = " + x2 + ";\n x3 = " + x3 + ";\n";
+            rMoveOutput.text += "z0 = " + z0 + ";\n z1 = " + z1 + ";\n z2 = " + z2 + ";\n z3 = " + z3 + ";\n";
+            rMoveOutput.text += "newXPos = " + newXPos + ";\n newZPos = " + newZPos + ";\n";
+
+
+
+            Player.transform.position = Vector3.Lerp(Player.transform.position, new Vector3(newXPos, Player.transform.position.y, newZPos), Time.deltaTime);
+            yield return new WaitForEndOfFrame();
         }
-        else
-        {
-            wifiButton.transform.FindChild("Text").GetComponent<Text>().text = "Stop WiFi scaninig";
-            wifiLoopCheck = true;
-            StartCoroutine(CheckWiFiRouters());
-        }
-    }
-    public void ToggleSun(bool _this)
-    {
-        Sun.SetActive(!Sun.activeSelf);
-    }
-    public void ToggleMoving(bool _this)
-    {
-        canvasMoving.gameObject.SetActive(!canvasMoving.gameObject.activeSelf);
+        StopCoroutine(RMoving());
+        yield break;
     }
 }
