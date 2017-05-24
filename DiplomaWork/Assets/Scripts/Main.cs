@@ -4,21 +4,36 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using NativeWifi;
+using System.IO;
 
 public struct listRouterInfo
 {
     double dist;
+    int freq;
+    int rssi;
     string ssid;
 
-    public listRouterInfo(double _dist, string _ssid)
+    public listRouterInfo(double _dist, int _freq, int _rssi, string _ssid)
     {
         dist = _dist;
+        freq = _freq;
+        rssi = _rssi;
         ssid = _ssid;
     }
 
     public double GetDist()
     {
         return dist;
+    }
+
+    public int GetFreq()
+    {
+        return freq;
+    }
+
+    public int GetRssi()
+    {
+        return rssi;
     }
 
     public string GetSsid()
@@ -557,6 +572,13 @@ public class Main: MonoBehaviour
                 break; 
         }
     }
+    public void SaveWiFiData()
+    {
+        if (!wifiLoopCheck)
+            return;
+        StartCoroutine(WriteWiFiData());
+                                                                    //Можно добавить затухание кнопки для убирания левых нажатий
+    }
 
     public void ToggleSun(bool _this)
     {
@@ -691,9 +713,9 @@ public class Main: MonoBehaviour
                                     double dist = Math.Pow(10.0, exp);
 
                                     if (wifiList.ContainsKey(BSSID))
-                                        wifiList[BSSID] = new listRouterInfo(dist, SSID);
+                                        wifiList[BSSID] = new listRouterInfo(dist, freq, rssi, SSID);
                                     else
-                                        wifiList.Add(BSSID, new listRouterInfo(dist, SSID));
+                                        wifiList.Add(BSSID, new listRouterInfo(dist, freq, rssi, SSID));
 
                                     wifiScanText.text += "'" + SSID + "' " + dist.ToString("F3") + "m.\n";
                                 }
@@ -748,15 +770,15 @@ public class Main: MonoBehaviour
                         var BSSID = System.Text.Encoding.ASCII.GetString(network.dot11Bssid).Trim((char)0);
                         var SSID = System.Text.Encoding.ASCII.GetString(network.dot11Ssid.SSID).Trim((char)0);
                         var rssi = network.rssi;
-                        var freq = network.chCenterFrequency / 1000;
+                        var freq = (int)network.chCenterFrequency / 1000;
 
                         double exp = (27.55 - (20 * Math.Log10(freq)) + Math.Abs(rssi)) / 20.0;
                         double dist = Math.Pow(10.0, exp);
 
                         if (wifiList.ContainsKey(BSSID))
-                            wifiList[BSSID] = new listRouterInfo(dist, SSID);
+                            wifiList[BSSID] = new listRouterInfo(dist, freq, rssi, SSID);
                         else
-                            wifiList.Add(BSSID, new listRouterInfo(dist, SSID));
+                            wifiList.Add(BSSID, new listRouterInfo(dist, freq, rssi, SSID));
 
                         wifiScanText.text += "'" + SSID + "' " + dist.ToString("F3") + "m.\n";
                     }
@@ -814,6 +836,38 @@ public class Main: MonoBehaviour
         wifiSetButton.gameObject.SetActive(false);
         wifiNextButton.gameObject.SetActive(false);
         StopCoroutine(CalibrateWiFiRouters());
+        yield break;
+    }
+    IEnumerator WriteWiFiData()
+    {
+        string cur_time = DateTime.Now.ToString("yyyy-MM-dd HH.mm.ss");
+        Directory.CreateDirectory(Application.persistentDataPath + "/" + cur_time);
+
+        while (wifiLoopCheck)
+        {
+            yield return new WaitForSeconds(1);
+
+            foreach (KeyValuePair<string, listRouterInfo> _pair in wifiList)
+            {
+                string l1 = _pair.Key;
+                string l2 = _pair.Value.GetSsid().Normalize();
+                l2 = l2.Substring(0, Math.Min(25, l2.Length));
+                double dist = _pair.Value.GetDist();
+                int freq = _pair.Value.GetFreq();
+                int rssi = _pair.Value.GetRssi();
+
+                try
+                {
+                    string fileName = Application.persistentDataPath + "/" + cur_time + "/wifidata_" + l2 + ".txt";
+                    StreamWriter sr = new StreamWriter(fileName, true);
+                    sr.WriteLine(dist.ToString() + " " + freq.ToString() + " " + rssi.ToString());
+                    sr.Close();
+                }
+                catch (Exception)
+                {}
+            }
+        }
+                                                                                //Можно добавить появление кнопки для убирания левых нажатий
         yield break;
     }
 
