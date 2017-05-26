@@ -6,12 +6,86 @@ using UnityEngine.UI;
 using NativeWifi;
 using System.IO;
 
+public struct kalmanSave
+{
+    public double x0, p0, f, q, h, r, st, co;
+
+    public kalmanSave (double _x0, double _p0, double _f, double _q, double _h, double _r, double _st, double _co)
+    {
+        x0 = _x0;
+        p0 = _p0;
+        f = _f;
+        q = _q;
+        h = _h;
+        r = _r;
+        st = _st;
+        co = _co;
+    }
+}
+class KalmanFilterSimple1D
+{
+    public double X0 { get; private set; } // predicted state
+    public double P0 { get; private set; } // predicted covariance
+
+    public double F { get; private set; } // factor of real value to previous real value
+    public double Q { get; private set; } // measurement noise
+    public double H { get; private set; } // factor of measured value to real value
+    public double R { get; private set; } // environment noise
+
+    public double State { get; private set; }
+    public double Covariance { get; private set; }
+
+    public KalmanFilterSimple1D(double q, double r, double f = 1, double h = 1)
+    {
+        Q = q;
+        R = r;
+        F = f;
+        H = h;
+    }
+
+    public KalmanFilterSimple1D(kalmanSave ks)
+    {
+        X0 = ks.x0;
+        P0 = ks.p0;
+        F = ks.f;
+        Q = ks.q;
+        H = ks.h;
+        R = ks.r;
+        State = ks.st;
+        Covariance = ks.co;
+    }
+
+    public kalmanSave Save()
+    {
+        return new kalmanSave(X0, P0, F, Q, H, R, State, Covariance);
+    }
+
+    public void SetState(double state, double covariance)
+    {
+        State = state;
+        Covariance = covariance;
+    }
+
+    public void Correct(double data)
+    {
+        //time update - Предсказание
+        X0 = F * State;
+        P0 = F * Covariance * F + Q;
+
+        //measurement update - Корректировка
+        var K = H * P0 / (H * P0 * H + R);
+        State = X0 + K * (data - H * X0);
+        Covariance = (1 - K * H) * P0;
+    }
+}
+
 public struct listRouterInfo
 {
     double dist;
     int freq;
     int rssi;
     string ssid;
+    KalmanFilterSimple1D kalman;
 
     public listRouterInfo(double _dist, int _freq, int _rssi, string _ssid)
     {
@@ -19,27 +93,26 @@ public struct listRouterInfo
         freq = _freq;
         rssi = _rssi;
         ssid = _ssid;
+        kalman = new KalmanFilterSimple1D(f: 1, h: 1, q: 0.1, r: 20);
+        kalman.SetState(_dist, 0);
     }
 
-    public double GetDist()
+    public listRouterInfo(double _dist, int _freq, int _rssi, string _ssid, kalmanSave _ks)
     {
-        return dist;
+        dist = _dist;
+        freq = _freq;
+        rssi = _rssi;
+        ssid = _ssid;
+        kalman = new KalmanFilterSimple1D(_ks);
+        kalman.Correct(_dist);
     }
 
-    public int GetFreq()
-    {
-        return freq;
-    }
-
-    public int GetRssi()
-    {
-        return rssi;
-    }
-
-    public string GetSsid()
-    {
-        return ssid;
-    }
+    public double GetDist()             { return dist; }
+    public double GetFilterDist()       { return kalman.State; }
+    public int GetFreq()                { return freq; }
+    public int GetRssi()                { return rssi; }
+    public string GetSsid()             { return ssid; }
+    public kalmanSave GetKalmanSave()   { return kalman.Save(); }
 }
 public struct cornerRouterInfo
 {
@@ -96,7 +169,7 @@ public class Main: MonoBehaviour
 
     // Working with routers
     bool wifiLoopCheck = false;
-    Dictionary<string, listRouterInfo> wifiList = new Dictionary<String, listRouterInfo>();
+    Dictionary<string, listRouterInfo> wifiList = new Dictionary<string, listRouterInfo>();
     int cornerNo = 0;
     Dictionary<string, cornerRouterInfo> listCornerRouters = new Dictionary<string, cornerRouterInfo>();
     float kX, kZ;
@@ -671,123 +744,85 @@ public class Main: MonoBehaviour
         gpsButton.enabled = true;
         yield break;
     }
+
     IEnumerator CheckWiFiRouters()
     {
         wifiScanText.color = Color.black;
         while (wifiLoopCheck)
         {
-            if (!os.Equals("Win"))
+            if (os.Equals("Win"))
+            {
+                // WINDOWS
+                WlanClient client;
+                client = new WlanClient();
+
+                foreach (WlanClient.WlanInterface wlanIface in client.Interfaces)
+                {
+                    wlanIface.Scan();                    
+                    yield return new WaitForSeconds(1);     // Ждем секунду, иначе получим пустоту на скане
+                    Wlan.WlanBssEntry[] wlanBssEntries1 = wlanIface.GetNetworkBssList();
+
+                    bool needToClear = true;
+                    foreach (Wlan.WlanBssEntry network in wlanBssEntries1)
+                    {
+                        if (needToClear)                    // Но если выдали пустоты, то не надо очищать от прошлых значений
+                        {
+                            wifiScanText.text = "";
+                            needToClear = false;
+                        }
+
+                        var BSSID = System.Text.Encoding.ASCII.GetString(network.dot11Bssid).Trim((char)0);
+                        var SSID = System.Text.Encoding.ASCII.GetString(network.dot11Ssid.SSID).Trim((char)0);
+                        var rssi = network.rssi;
+                        var freq = (int)network.chCenterFrequency / 1000;
+
+                        SaveScannedWiFi(ref BSSID, ref SSID, ref rssi, ref freq);
+                    }
+                }
+                // WINDOWS
+            }
+            else
             {
                 // ANDROID
                 using (AndroidJavaObject activity = new AndroidJavaClass("com.unity3d.player.UnityPlayer").GetStatic<AndroidJavaObject>("currentActivity"))
                 {
                     using (var wifiManager = activity.Call<AndroidJavaObject>("getSystemService", "wifi"))
                     {
-                        try
+                        var enabled = wifiManager.Call<bool>("isWifiEnabled");
+                        if (!enabled)
                         {
-                            var enabled = wifiManager.Call<Boolean>("isWifiEnabled");
-                            if (!enabled)
-                            {
-                                wifiScanText.text = "WiFi is Off; \n";
-                                wifiScanButton.transform.Find("Text").GetComponent<Text>().text = "Start WiFi scaning";
-                                wifiLoopCheck = false;
-                                wifiCalibrateButton.interactable = false;
-                            }
-                            else
-                            {
-                                wifiScanText.text = "";
-                                if (!wifiManager.Call<bool>("startScan"))
-                                    continue;
-
-                                var scanlist = wifiManager.Call<AndroidJavaObject>("getScanResults");
-                                var size = scanlist.Call<int>("size");
-                                for (int i = 0; i < size; i++)
-                                {
-                                    var scanResult = scanlist.Call<AndroidJavaObject>("get", i);
-                                    var BSSID = scanResult.Get<String>("BSSID");
-                                    var SSID = scanResult.Get<String>("SSID");
-                                    var rssi = scanResult.Get<int>("level");
-                                    var freq = scanResult.Get<int>("frequency");
-
-                                    double exp = (27.55 - (20 * Math.Log10(freq)) + Math.Abs(rssi)) / 20.0;
-                                    double dist = Math.Pow(10.0, exp);
-
-                                    if (wifiList.ContainsKey(BSSID))
-                                        wifiList[BSSID] = new listRouterInfo(dist, freq, rssi, SSID);
-                                    else
-                                        wifiList.Add(BSSID, new listRouterInfo(dist, freq, rssi, SSID));
-
-                                    wifiScanText.text += "'" + SSID + "' " + dist.ToString("F3") + "m.\n";
-                                }
-                            }
+                            wifiScanText.text = "WiFi is Off; \n";
+                            wifiScanButton.transform.Find("Text").GetComponent<Text>().text = "Start WiFi scaning";
+                            wifiLoopCheck = false;
+                            wifiCalibrateButton.interactable = false;
                         }
-                        catch (Exception e)
+                        else
                         {
-                            wifiScanText.color = Color.red;
-                            wifiScanText.text = e.ToString();
+                            yield return new WaitForSeconds(1);
+                            wifiScanText.text = "";
+                            if (!wifiManager.Call<bool>("startScan"))
+                                continue;
+
+                            var scanlist = wifiManager.Call<AndroidJavaObject>("getScanResults");
+                            var size = scanlist.Call<int>("size");
+                            for (int i = 0; i < size; i++)
+                            {
+                                var scanResult = scanlist.Call<AndroidJavaObject>("get", i);
+                                var BSSID = scanResult.Get<string>("BSSID");
+                                var SSID = scanResult.Get<string>("SSID");
+                                var rssi = scanResult.Get<int>("level");
+                                var freq = scanResult.Get<int>("frequency");
+
+                                SaveScannedWiFi(ref BSSID, ref SSID, ref rssi, ref freq);
+                            }
                         }
                     }
                 }
-                yield return new WaitForEndOfFrame();
                 // ANDROID
             }
-            else
-            {
-                // WINDOWS
-                WlanClient client;
-                try
-                {
-                    client = new WlanClient();
-                }
-                catch (Exception)
-                {
-                    continue;
-                }
-
-                foreach (WlanClient.WlanInterface wlanIface in client.Interfaces)
-                {                    
-                    try
-                    {
-                        wlanIface.Scan();
-                    }
-                    catch (Exception)
-                    {
-                        break;
-                    }
-
-
-                    yield return new WaitForSeconds(1);
-                    
-                    bool needToCleanOutput = true;
-                    Wlan.WlanBssEntry[] wlanBssEntries1 = wlanIface.GetNetworkBssList();
-                    foreach (Wlan.WlanBssEntry network in wlanBssEntries1)
-                    {
-                        if (needToCleanOutput)
-                        {
-                            wifiScanText.text = "";
-                            needToCleanOutput = false;
-                        }
-                        var BSSID = System.Text.Encoding.ASCII.GetString(network.dot11Bssid).Trim((char)0);
-                        var SSID = System.Text.Encoding.ASCII.GetString(network.dot11Ssid.SSID).Trim((char)0);
-                        var rssi = network.rssi;
-                        var freq = (int)network.chCenterFrequency / 1000;
-
-                        double exp = (27.55 - (20 * Math.Log10(freq)) + Math.Abs(rssi)) / 20.0;
-                        double dist = Math.Pow(10.0, exp);
-
-                        if (wifiList.ContainsKey(BSSID))
-                            wifiList[BSSID] = new listRouterInfo(dist, freq, rssi, SSID);
-                        else
-                            wifiList.Add(BSSID, new listRouterInfo(dist, freq, rssi, SSID));
-
-                        wifiScanText.text += "'" + SSID + "' " + dist.ToString("F3") + "m.\n";
-                    }
-                }
-                // WINDOWS
-            }
-
             if (!wifiScanButton.interactable)
                 wifiScanButton.interactable = true;
+            yield return new WaitForEndOfFrame();
         }
         yield return new WaitForSeconds(2);
         wifiScanButton.interactable = true;
@@ -850,25 +885,48 @@ public class Main: MonoBehaviour
             foreach (KeyValuePair<string, listRouterInfo> _pair in wifiList)
             {
                 string l1 = _pair.Key;
-                string l2 = _pair.Value.GetSsid().Normalize();
+                string l2 = _pair.Value.GetSsid();
                 l2 = l2.Substring(0, Math.Min(25, l2.Length));
+                l2 = l2.Replace('/', '-');
+                l2 = l2.Replace('|', '-');
+                l2 = l2.Replace('\\', '-');
                 double dist = _pair.Value.GetDist();
-                int freq = _pair.Value.GetFreq();
-                int rssi = _pair.Value.GetRssi();
+                double filterDist = _pair.Value.GetFilterDist();
 
                 try
                 {
                     string fileName = Application.persistentDataPath + "/" + cur_time + "/wifidata_" + l2 + ".txt";
                     StreamWriter sr = new StreamWriter(fileName, true);
-                    sr.WriteLine(dist.ToString() + " " + freq.ToString() + " " + rssi.ToString());
+                    sr.WriteLine(dist.ToString() + " " + filterDist.ToString());
                     sr.Close();
                 }
-                catch (Exception)
-                {}
+                catch (Exception e)
+                {
+                    wifiScanText.text = "WiFi is Off; \n";
+                    wifiScanButton.transform.Find("Text").GetComponent<Text>().text = "Start WiFi scaning";
+                    wifiLoopCheck = false;
+                    wifiCalibrateButton.interactable = false;
+
+                    wifiCalibrateText.color = Color.red;
+                    wifiCalibrateText.text = e.ToString();
+                    wifiCalibrateText.text += "\n" + l2;
+                }
             }
         }
                                                                                 //Можно добавить появление кнопки для убирания левых нажатий
         yield break;
+    }
+    void SaveScannedWiFi(ref string BSSID, ref string SSID, ref int rssi, ref int freq)
+    {
+        double exp = (27.55 - (20 * Math.Log10(freq)) + Math.Abs(rssi)) / 20.0;
+        double dist = Math.Pow(10.0, exp);
+
+        if (wifiList.ContainsKey(BSSID))
+            wifiList[BSSID] = new listRouterInfo(dist, freq, rssi, SSID, wifiList[BSSID].GetKalmanSave());
+        else
+            wifiList.Add(BSSID, new listRouterInfo(dist, freq, rssi, SSID));
+
+        wifiScanText.text += "'" + SSID + "' " + dist.ToString("F3") + "m.\n";
     }
 
     IEnumerator SwipeOptionToOptions()
