@@ -1,0 +1,13 @@
+.gitignore
+
+*.pdb
+
+.vs
+Temp
+
+Library
+*.meta
+
+*.apk
+*.exe
+*_Data
