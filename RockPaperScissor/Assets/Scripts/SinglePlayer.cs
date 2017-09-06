@@ -4,11 +4,8 @@ using UnityEngine.UI;
 public class SinglePlayer : MonoBehaviour
 {
     public Canvas canvasSingle, canvasMainMenu;
-    public Text avatarPlayerName, counter;
+    public Text counter;
     public Image leftNothing, leftRock, leftPaper, leftScissors, rightNothing, rightRock, rightPaper, rightScissors;
-
-    static int w_count, l_count;
-    static string playerName;
 
     int lastMoves;
 
@@ -21,17 +18,7 @@ public class SinglePlayer : MonoBehaviour
 
     void Update()
     {
-        avatarPlayerName.text = playerName;
-        counter.text = w_count + " : " + l_count;
-    }
-
-    //=====================================================================================================================
-
-    public static void StartNewGame()
-    {
-        w_count = Account.GetSpWin();
-        l_count = Account.GetSpLoose();
-        playerName = Account.GetName();
+        counter.text = Account.GetWinScores() + " : " + Account.GetLooseScores();
     }
 
     //=====================================================================================================================
@@ -118,19 +105,17 @@ public class SinglePlayer : MonoBehaviour
             playerMove == (int)Moves.Rock     && aiMove == (int)Moves.Scissors ||
             playerMove == (int)Moves.Paper    && aiMove == (int)Moves.Rock)
         {
-            Account.AddSpWin();
-            w_count++;
+            Account.AddWinScore();
         }
 
         if (playerMove == (int)Moves.Rock     && aiMove == (int)Moves.Paper    ||
             playerMove == (int)Moves.Paper    && aiMove == (int)Moves.Scissors ||
             playerMove == (int)Moves.Scissors && aiMove == (int)Moves.Rock)
         {
-            Account.AddSpLoose();
-            l_count++;
+            Account.AddLooseScore();
         }
 
-        Account.QuickSave();
+        Account.SaveAccount();
     }
 
     public void PressBack()

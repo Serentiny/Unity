@@ -1,8 +1,6 @@
 ﻿using System;
 using System.IO;
-using System.Text.RegularExpressions;
 using UnityEngine;
-using UnityEngine.UI;
 
 public enum Moves
 {
@@ -11,18 +9,21 @@ public enum Moves
     Scissors = 3
 }
 
+public enum LoadMessage
+{
+    Continue = 0,
+    New = 1
+}
+
 public class Account : MonoBehaviour
 {
-    public InputField inputName;
-    public Text textError;
-    public Canvas canvasNewAccount, canvasEditAccount, canvasMainMenu;
-    public Image avatar;
-    public Text avatarPlayerName;
+    public Canvas canvasNewAccount, canvasMainMenu;
 
     static string path;
     static string playerName;
-    static int spWin, spLoose;
+    static int winScores, looseScores;
     static int lastMoves;
+    static int imageNum, playerNum;
 
     const int windowMovesSize = 5;
 
@@ -30,60 +31,88 @@ public class Account : MonoBehaviour
 
     void Start()
     {
-        textError.gameObject.SetActive(false);
+        path = Application.persistentDataPath;
     }
 
     void Update()
     {
-        avatarPlayerName.text = playerName;
     }
 
     //=====================================================================================================================
 
-    public static void NewAccount(ref string fileName)
+    public static LoadMessage LoadAccount(int num)
     {
-        path = fileName;
-    }
-    public static void LoadAccount(ref string fileName)
-    {
-        path = fileName;
-        StreamReader sr = new StreamReader(path, true);
+        playerNum = num;
+        StreamReader sr = new StreamReader(path + "/player" + playerNum + ".txt", true);
         playerName = sr.ReadLine();                         //"Serentiny"
-                                                                //TODO: Номер картинки
-        Int32.TryParse(sr.ReadLine(), out spWin);           //15
-        Int32.TryParse(sr.ReadLine(), out spLoose);         //10
-        Int32.TryParse(sr.ReadLine(), out lastMoves);       //"00123" == [_ _ К Н Б]
+        if (playerName == "")
+        {
+            sr.Close();
+            return LoadMessage.New;   //Создаем нового пользователя
+        }
 
-        MenuScripts.SetPlayerName(ref playerName);
+        Int32.TryParse(sr.ReadLine(), out winScores);       //15
+        Int32.TryParse(sr.ReadLine(), out looseScores);     //10
+        Int32.TryParse(sr.ReadLine(), out lastMoves);       //00123 == [_ _ К Н Б]
+        Int32.TryParse(sr.ReadLine(), out imageNum);        //2 == Номер картинки
+        sr.Close();
+        return LoadMessage.Continue;   //Выбрали пользователя - продолжаем игру
+    }
+    public static void SaveAccount()
+    {
+        StreamWriter sw = new StreamWriter(path + "/player" + playerNum + ".txt", false);
+        sw.WriteLine(playerName);
+
+        sw.WriteLine(winScores.ToString());
+        sw.WriteLine(looseScores.ToString());
+        sw.WriteLine(lastMoves.ToString());
+        sw.WriteLine(imageNum.ToString());
+        sw.Close();
     }
 
-    public static string GetName()
+    public static string GetPlayerName()
     {
         return playerName;
-    }
-    public static int GetSpWin()
-    {
-        return spWin;
-    }
-    public static int GetSpLoose()
-    {
-        return spLoose;
-    }
-    public static int GetLastMoves()
-    {
-        return lastMoves;
     }
     public static int GetWindowMovesSize()
     {
         return windowMovesSize;
     }
-    public static void AddSpWin()
+    public static int GetWinScores()
     {
-        spWin++;
+        return winScores;
     }
-    public static void AddSpLoose()
+    public static int GetLooseScores()
     {
-        spLoose++;
+        return looseScores;
+    }
+    public static int GetLastMoves()
+    {
+        return lastMoves;
+    }
+    public static int GetImageNum()
+    {
+        return imageNum;
+    }
+
+    public static void SetPlayerName(string name)
+    {
+        playerName = name;
+    }
+    public static void SetDefaultValues()
+    {
+        winScores = 0;
+        looseScores = 0;
+        lastMoves = 123;
+        imageNum = 1;
+    }
+    public static void AddWinScore()
+    {
+        winScores++;
+    }
+    public static void AddLooseScore()
+    {
+        looseScores++;
     }
     public static void AddNewMove(int move)
     {
@@ -103,65 +132,19 @@ public class Account : MonoBehaviour
         int cut = (int)Math.Pow(10, windowMovesSize);
         lastMoves %= cut;
     }
-
-    public static void QuickSave()
+    public static void NextAvatarImage()
     {
-        StreamWriter sw = new StreamWriter(path, false);
-        sw.WriteLine(playerName);
-                                                                //TODO: Номер картинки
-        sw.WriteLine(spWin.ToString());
-        sw.WriteLine(spLoose.ToString());
-        sw.WriteLine(lastMoves.ToString());
-        sw.Close();
+        imageNum++;
+        if (imageNum > MenuScripts.spriteListSize)
+            imageNum = 1;
+        SaveAccount();
     }
-
-    //=====================================================================================================================
-
-    public void PressSaveAccount()
+    public static void PrevAvatarImage()
     {
-        textError.gameObject.SetActive(false);
-
-        if (!IsPlayerNameGood(inputName.text))
-            return;
-
-        playerName = inputName.text;
-        spWin = 0;
-        spLoose = 0;
-        lastMoves = 123;
-
-        QuickSave();
-
-        MenuScripts.SetPlayerName(ref playerName);
-        canvasNewAccount.gameObject.SetActive(false);
-        canvasMainMenu.gameObject.SetActive(true);
+        imageNum--;
+        if (imageNum == 0)
+            imageNum = MenuScripts.spriteListSize;
+        SaveAccount();
     }
-    public void PressBack()
-    {
-        canvasEditAccount.gameObject.SetActive(false);
-        canvasMainMenu.gameObject.SetActive(true);
-    }
-
-    bool IsPlayerNameGood(string name)
-    {
-        if (name.Length < 3)
-        {
-            textError.text = "Too short name." + "\n" + "Need more than 3 letters.";
-            textError.gameObject.SetActive(true);
-            return false;
-        }
-        if (name.Length > 16)
-        {
-            textError.text = "Too long name." + "\n" + "Need less than 16 letters.";
-            textError.gameObject.SetActive(true);
-            return false;
-        }
-        if (!Regex.IsMatch(name, "[a-zA-Z]"))
-        {
-            textError.text = "Wrong language." + "\n" + "Type Name in English.";
-            textError.gameObject.SetActive(true);
-            return false;
-        }
-
-        return true;
-    }
+    
 }
