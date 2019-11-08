@@ -143,7 +143,7 @@ public class MenuScripts : MonoBehaviour
             textRate3.text = spWin + " : " + spLoose;
             textName3.text = accName;
         }
-        sr2.Close();
+        sr3.Close();
     }
 
     void Update()
