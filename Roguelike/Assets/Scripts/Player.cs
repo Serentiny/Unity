@@ -1,54 +1,104 @@
 ﻿using UnityEngine;
-using System.Collections;
+using System;
+using System.Collections.Generic;
 
 public class Player : MonoBehaviour
 {
-    static float f_step, f_angle;
-    public static int rot_dir;
+    static float moveRemain, rotateRemain, dt, dMove, dRotate;
+    static SceneOptions.MoveDirection moveDir, cameraDir;
+    static SceneOptions.RotationDirection rotateDir;
+    static Queue<SceneOptions.MoveDirection> queueMoveDir;
+    static Queue<SceneOptions.RotationDirection> queueRotateDir;
 
     void Start()
     {
-        f_angle = 0F;
-        f_step = 0F;
-        rot_dir = 0;
+        moveRemain   = 0F;
+        rotateRemain = 0F;
+        queueMoveDir = new Queue<SceneOptions.MoveDirection>();
+        queueRotateDir = new Queue<SceneOptions.RotationDirection>();
+        cameraDir = SceneOptions.MoveDirection.Forward;
+        moveDir = SceneOptions.MoveDirection.Forward;
+        rotateDir = SceneOptions.RotationDirection.Right;   // using enum as a sign
     }
 
     void Update()
     {
-        //Движение и повороты по клеткам
-        if ( SceneOptions.IsButtonWASD() || SceneOptions.IsButtonQE(false) )
+        if (rotateRemain == 0F && queueRotateDir.Count != 0)
         {
-            //поворачиваемся в нужную сторону
-            if ( SceneOptions.IsButtonQE(false) && RotatePoint.IsWaiting() )
+            rotateDir = queueRotateDir.Dequeue();
+            rotateRemain = 90F * (int)rotateDir;
+            cameraDir = SceneOptions.RotateEnumMoveDirection(cameraDir, rotateDir);
+        }
+        if (moveRemain == 0F && queueMoveDir.Count != 0)
+        {
+            moveDir = SceneOptions.SumEnumMoveDirection(cameraDir, queueMoveDir.Dequeue());
+            moveRemain = SceneOptions.GetTileLength();
+        }
+        
+        dt      = Time.deltaTime;
+        dMove   = SceneOptions.GetPlayerMoveSpeed()   * dt;
+        dRotate = SceneOptions.GetPlayerRotateSpeed() * dt * (int)rotateDir;
+        
+        if (rotateRemain != 0F || moveRemain != 0F)
+        {
+            if (moveRemain != 0F)
             {
-                f_angle += Time.deltaTime * SceneOptions.GetPlayerRotateSpeed();
-                Transform rotateTarget  = RotatePoint.GetTransform();
-                transform.rotation = Quaternion.RotateTowards(transform.rotation, rotateTarget.rotation, Time.deltaTime * SceneOptions.GetPlayerRotateSpeed());
+                if (Math.Abs(moveRemain) < Math.Abs(dMove))
+                {
+                    dMove = moveRemain;
+                    moveRemain = 0F;
+                }
+                else
+                {
+                    moveRemain -= dMove;
+                }
+                transform.position += SceneOptions.EnumMoveDirectionToVector3(moveDir) * dMove;
             }
-
-            //двигаемся по указанной позиции
-            if ( SceneOptions.IsButtonWASD() && WayPoint.IsWaiting())
+            if (rotateRemain != 0F)
             {
-                f_step += Time.deltaTime * SceneOptions.GetPlayerMoveSpeed();
-                Transform moveTarget = WayPoint.GetTransform();
-                transform.position = Vector3.MoveTowards(transform.position, moveTarget.position, Time.deltaTime * SceneOptions.GetPlayerMoveSpeed());
+                if (Math.Abs(rotateRemain) < Math.Abs(dRotate))
+                {
+                    dRotate = rotateRemain;
+                    rotateRemain = 0F;
+                }
+                else
+                {
+                    rotateRemain -= dRotate;
+                }
+                transform.Rotate(0, dRotate, 0);
             }
         }
     }
 
-    public static float GetStep()
+    public static bool QueueMoving(SceneOptions.MoveDirection dir)
     {
-        return f_step;
+        if (queueMoveDir.Count == 0)
+        {
+            queueMoveDir.Enqueue(dir);
+            return true;
+        }
+        return false;
+    }
+    public static bool QueueRotating(SceneOptions.RotationDirection dir)
+    {
+        if (queueRotateDir.Count == 0)
+        {
+            queueRotateDir.Enqueue(dir);
+            return true;
+        }
+        return false;
     }
 
-    public static float GetAngle()
+    public static bool IsMoving()
     {
-        return f_angle;
+        return moveRemain != 0F;
     }
-
-    public static void ResetTransformCounter()
+    public static bool IsRotating()
     {
-        f_angle = 0F;
-        f_step  = 0F;
+        return rotateRemain != 0F;
+    }
+    public static SceneOptions.MoveDirection GetCameraDir()
+    {
+        return cameraDir;
     }
 }

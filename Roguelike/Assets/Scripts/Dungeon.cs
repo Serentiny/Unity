@@ -4,16 +4,16 @@ using System;
 
 public class Dungeon : MonoBehaviour
 {
-    public static map dungeon_map;
+    public static Map dungeon_map;
 
-    public struct Cell
+    public enum CellType
     {
-        public const int FLOOR = 0;
-        public const int WALL = 1;
-        public const int WAY_OUT = 2;
-        public const int WAY_IN = 3;
-        public const int TREASURE = 4;
-        public const int MONSTER = 5;
+        Empty,
+        Wall,
+        Way_Out,
+        Way_In,
+        Treasure,
+        Monster,
     }
     public struct Percentage
     {
@@ -29,21 +29,21 @@ public class Dungeon : MonoBehaviour
         public const int MOVE_LEFT  = 3;
     }
 
-    public class coord
+    public class Coord
     {
         public int x, y;
 
-        public coord()
+        public Coord()
         {
             x = 0;
             y = 0;
         }
-        public coord(int _x, int _y)
+        public Coord(int _x, int _y)
         {
             x = _x;
             y = _y;
         }
-        public coord(coord c)
+        public Coord(Coord c)
         {
             x = c.x;
             y = c.y;
@@ -58,33 +58,33 @@ public class Dungeon : MonoBehaviour
             if (obj == null || GetType() != obj.GetType())
                 return false;
 
-            coord a = (coord)obj;
+            Coord a = (Coord)obj;
             return (x == a.x && y == a.y);
         }
         public override int GetHashCode()
         {
             return x * 387 ^ y;
         }
-        public static bool operator ==(coord a, coord b)
+        public static bool operator ==(Coord a, Coord b)
         {
             return (a.x == b.x && a.y == b.y);
         }
-        public static bool operator !=(coord a, coord b)
+        public static bool operator !=(Coord a, Coord b)
         {
             return !(a == b);
         }
     }
-    public class cell
+    public class Cell
     {
-        public coord pos;
-        public int inside;
-        public List<cell> cell_list;
+        public Coord pos;
+        public CellType inside;
+        public List<Cell> cell_list;
 
-        public cell()
+        public Cell()
         {
-            inside = Cell.WALL;
-            pos = new coord(-1, -1);
-            cell_list = new List<cell>();
+            inside = CellType.Wall;
+            pos = new Coord(-1, -1);
+            cell_list = new List<Cell>();
             for (int i = 0; i < 4; i++)
                 cell_list.Add(null);
         }
@@ -93,22 +93,22 @@ public class Dungeon : MonoBehaviour
             if (obj == null || GetType() != obj.GetType())
                 return false;
 
-            cell a = (cell)obj;
+            Cell a = (Cell)obj;
             return (inside == a.inside);
         }
         public override int GetHashCode()
         {
-            return (inside * 387 ^ pos.x) * 387 ^ pos.y;
+            return ((int)inside * 387 ^ pos.x) * 387 ^ pos.y;
         }
     }
-    public class map
+    public class Map
     {
-        public static List<List<cell>> dungeon;
-        public static coord way_in, way_out, player;
+        public static List<List<Cell>> dungeon;
+        public static Coord way_in, way_out, player;
 
-        public map()
+        public Map()
         { }
-        public map(int dim)
+        public Map(int dim)
         {
             InitDungeonDim(out dungeon, dim);
             int floor = CreateDungeon(ref dungeon, ref way_in, ref way_out);
@@ -116,7 +116,7 @@ public class Dungeon : MonoBehaviour
             if (floor == 0)
                 floor = 0;
         }
-        public cell this[int x, int y]
+        public Cell this[int x, int y]
         {
             get
             {
@@ -127,34 +127,34 @@ public class Dungeon : MonoBehaviour
                 dungeon[x][y] = value;
             }
         }
-        public static bool canMove(int dir)
+        public static bool CanMove(int dir)
         {
             switch (dir)
             {
                 case 0:
                     if (player.y + 1 == dungeon.Count)
                         return false;
-                    return dungeon[player.x][player.y + 1].inside == Cell.WALL ? false : true;
+                    return dungeon[player.x][player.y + 1].inside == CellType.Wall ? false : true;
                 case 1:
                 case -3:
                     if (player.x + 1 == dungeon.Count)
                         return false;
-                    return dungeon[player.x + 1][player.y].inside == Cell.WALL ? false : true;
+                    return dungeon[player.x + 1][player.y].inside == CellType.Wall ? false : true;
                 case 2:
                 case -2:
                     if (player.y == 0)
                         return false;
-                    return dungeon[player.x][player.y - 1].inside == Cell.WALL ? false : true;
+                    return dungeon[player.x][player.y - 1].inside == CellType.Wall ? false : true;
                 case 3:
                 case -1:
                     if (player.x == 0)
                         return false;
-                    return dungeon[player.x - 1][player.y].inside == Cell.WALL ? false : true;
+                    return dungeon[player.x - 1][player.y].inside == CellType.Wall ? false : true;
                 default:
                     return false;
             }
         }
-        public static void movePlayer(int dir)
+        public static void MovePlayer(int dir)
         {
             switch (dir)
             {
@@ -179,16 +179,16 @@ public class Dungeon : MonoBehaviour
         }
     }
 
-    static void InitDungeonDim(out List<List<cell>> dungeon, int dim)
+    static void InitDungeonDim(out List<List<Cell>> dungeon, int dim)
     {
-        dungeon = new List<List<cell>>();
+        dungeon = new List<List<Cell>>();
         for (int i = 0; i < dim; i++)
         {
-            dungeon.Add(new List<cell>());
+            dungeon.Add(new List<Cell>());
             for (int j = 0; j < dim; j++)
             {
-                dungeon[i].Add(new cell());
-                dungeon[i][j].pos = new coord(i, j);
+                dungeon[i].Add(new Cell());
+                dungeon[i][j].pos = new Coord(i, j);
             }
         }
 
@@ -202,22 +202,22 @@ public class Dungeon : MonoBehaviour
             }
     }
 
-    static int CreateDungeon(ref List<List<cell>> dungeon, ref coord way_in, ref coord way_out)
+    static int CreateDungeon(ref List<List<Cell>> dungeon, ref Coord way_in, ref Coord way_out)
     {
         int empty = 0, dim = dungeon.Count;
         bool reached = false;
         SetEntrances(out way_in, out way_out, dim);
-        dungeon[way_in.x][way_in.y].inside = Cell.WAY_IN;
-        dungeon[way_out.x][way_out.y].inside = Cell.WAY_OUT;
+        dungeon[way_in.x][way_in.y].inside = CellType.Way_In;
+        dungeon[way_out.x][way_out.y].inside = CellType.Way_Out;
 
-        coord nearest = way_in;
-        Queue<coord> q = new Queue<coord>();
+        Coord nearest = way_in;
+        Queue<Coord> q = new Queue<Coord>();
         for (int i = 0; i < 4; i++)
             if (dungeon[way_in.x][way_in.y].cell_list[i] != null)
             {
-                if ((dungeon[way_in.x][way_in.y].cell_list[i]).inside == Cell.WALL)
+                if ((dungeon[way_in.x][way_in.y].cell_list[i]).inside == CellType.Wall)
                 {
-                    dungeon[way_in.x][way_in.y].cell_list[i].inside = Cell.FLOOR;
+                    dungeon[way_in.x][way_in.y].cell_list[i].inside = CellType.Empty;
                     empty++;
                 }
                 q.Enqueue(dungeon[way_in.x][way_in.y].cell_list[i].pos);
@@ -229,11 +229,11 @@ public class Dungeon : MonoBehaviour
                 q.Enqueue(nearest);
 
             //отвечает клетки, в которых мы еще не были
-            List<coord> into = new List<coord>();
-            coord c = q.Peek();
+            List<Coord> into = new List<Coord>();
+            Coord c = q.Peek();
 
             //проверим, дошли ли мы до выхода из подземелья
-            nearest = nearby(ref way_out, ref c, ref nearest);
+            nearest = GetNearby(ref way_out, ref c, ref nearest);
             if (c == way_out)
                 reached = true;
             q.Dequeue();
@@ -241,7 +241,7 @@ public class Dungeon : MonoBehaviour
             //у нас есть клетка, и до трех не занятых выходов из нее. Узнаем точно, сколько у нас проходов
             for (int i = 0; i < 4; i++)
             {
-                if (dungeon[c.x][c.y].cell_list[i] != null && dungeon[c.x][c.y].cell_list[i].inside != Cell.FLOOR && dungeon[c.x][c.y].cell_list[i].inside != Cell.WAY_IN)
+                if (dungeon[c.x][c.y].cell_list[i] != null && dungeon[c.x][c.y].cell_list[i].inside != CellType.Empty && dungeon[c.x][c.y].cell_list[i].inside != CellType.Way_In)
                     into.Add(dungeon[c.x][c.y].cell_list[i].pos);
             }
 
@@ -254,13 +254,13 @@ public class Dungeon : MonoBehaviour
                     {
                         switch (dungeon[into[0].x][into[0].y].inside)
                         {
-                            case Cell.WALL:
+                            case CellType.Wall:
                                 {
-                                    dungeon[into[0].x][into[0].y].inside = Cell.FLOOR;
+                                    dungeon[into[0].x][into[0].y].inside = CellType.Empty;
                                     q.Enqueue(into[0]);
                                     break;
                                 }
-                            case Cell.WAY_OUT:
+                            case CellType.Way_Out:
                                 {
                                     q.Enqueue(into[0]);
                                     break;
@@ -277,13 +277,13 @@ public class Dungeon : MonoBehaviour
                         {
                             switch (dungeon[into[i].x][into[i].y].inside)
                             {
-                                case Cell.WALL:
+                                case CellType.Wall:
                                     {
-                                        dungeon[into[i].x][into[i].y].inside = Cell.FLOOR;
+                                        dungeon[into[i].x][into[i].y].inside = CellType.Empty;
                                         q.Enqueue(into[i]);
                                         break;
                                     }
-                                case Cell.WAY_OUT:
+                                case CellType.Way_Out:
                                     {
                                         q.Enqueue(into[i]);
                                         break;
@@ -297,13 +297,13 @@ public class Dungeon : MonoBehaviour
                         int i = UnityEngine.Random.Range(0, 2);
                         switch (dungeon[into[i].x][into[i].y].inside)
                         {
-                            case Cell.WALL:
+                            case CellType.Wall:
                                 {
-                                    dungeon[into[i].x][into[i].y].inside = Cell.FLOOR;
+                                    dungeon[into[i].x][into[i].y].inside = CellType.Empty;
                                     q.Enqueue(into[i]);
                                     break;
                                 }
-                            case Cell.WAY_OUT:
+                            case CellType.Way_Out:
                                 {
                                     q.Enqueue(into[i]);
                                     break;
@@ -320,13 +320,13 @@ public class Dungeon : MonoBehaviour
                         {
                             switch (dungeon[into[i].x][into[i].y].inside)
                             {
-                                case Cell.WALL:
+                                case CellType.Wall:
                                     {
-                                        dungeon[into[i].x][into[i].y].inside = Cell.FLOOR;
+                                        dungeon[into[i].x][into[i].y].inside = CellType.Empty;
                                         q.Enqueue(into[i]);
                                         break;
                                     }
-                                case Cell.WAY_OUT:
+                                case CellType.Way_Out:
                                     {
                                         q.Enqueue(into[i]);
                                         break;
@@ -344,13 +344,13 @@ public class Dungeon : MonoBehaviour
                                 continue;
                             switch (dungeon[into[i].x][into[i].y].inside)
                             {
-                                case Cell.WALL:
+                                case CellType.Wall:
                                     {
-                                        dungeon[into[i].x][into[i].y].inside = Cell.FLOOR;
+                                        dungeon[into[i].x][into[i].y].inside = CellType.Empty;
                                         q.Enqueue(into[i]);
                                         break;
                                     }
-                                case Cell.WAY_OUT:
+                                case CellType.Way_Out:
                                     {
                                         q.Enqueue(into[i]);
                                         break;
@@ -364,13 +364,13 @@ public class Dungeon : MonoBehaviour
                         int i = UnityEngine.Random.Range(0, 3); //так ячейка, в которую мы пойдем
                         switch (dungeon[into[i].x][into[i].y].inside)
                         {
-                            case Cell.WALL:
+                            case CellType.Wall:
                                 {
-                                    dungeon[into[i].x][into[i].y].inside = Cell.FLOOR;
+                                    dungeon[into[i].x][into[i].y].inside = CellType.Empty;
                                     q.Enqueue(into[i]);
                                     break;
                                 }
-                            case Cell.WAY_OUT:
+                            case CellType.Way_Out:
                                 {
                                     q.Enqueue(into[i]);
                                     break;
@@ -386,22 +386,22 @@ public class Dungeon : MonoBehaviour
         return empty;
     }
 
-    static void SetEntrances(out coord way_in, out coord way_out, int dim)
+    static void SetEntrances(out Coord way_in, out Coord way_out, int dim)
     {
-        way_in = new coord();
-        way_out = new coord();
+        way_in = new Coord();
+        way_out = new Coord();
         way_in.SetRand(dim);
         do
             way_out.SetRand(dim);
         while (way_in == way_out);
     }
 
-    static coord nearby(ref coord to, ref coord from_1, ref coord from_2)
+    static Coord GetNearby(ref Coord to, ref Coord from_1, ref Coord from_2)
     {
-        return (distance(ref from_1, ref to) < distance(ref from_2, ref to) ? from_1 : from_2);
+        return (CalcDistance(ref from_1, ref to) < CalcDistance(ref from_2, ref to) ? from_1 : from_2);
     }
 
-    static int distance(ref coord from, ref coord to)
+    static int CalcDistance(ref Coord from, ref Coord to)
     {
         return (Math.Abs(from.x - to.x) + Math.Abs(from.y - to.y));
     }
