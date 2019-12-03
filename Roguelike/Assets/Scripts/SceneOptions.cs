@@ -10,6 +10,7 @@ public class SceneOptions : MonoBehaviour
         Forward = 0,    // [w] or ( 0, 0,  1)
         Right = 1,      // [d] or ( 1, 0,  0)
         Back = 2,       // [s] or ( 0, 0, -1)
+        Down = 2,       // same
         Left = 3,       // [a] or (-1, 0,  0)
     }
     static int sizeMoveDirections = Enum.GetNames(typeof(MoveDirection)).Length;
@@ -105,9 +106,9 @@ public class SceneOptions : MonoBehaviour
         return true;
     }
 
-    public static int GetMoveDirection()
+    public static SceneOptions.MoveDirection GetMoveDirection()
     {
-        return (int)SumEnumMoveDirection(Player.GetCameraDir(), KeyActionToMoveDirection(keyboardAction));
+        return SumEnumMoveDirection(Player.GetCameraDir(), KeyActionToMoveDirection(keyboardAction));
     }
 
     // Enum methods
