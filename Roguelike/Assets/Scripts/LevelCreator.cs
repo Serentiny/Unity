@@ -2,8 +2,6 @@
 
 public class LevelCreator : MonoBehaviour
 {
-    const int dim = 20;   // должно изменяться со стороны, а не константа
-
     public GameObject Player;
     public GameObject Cell_Empty;
     public GameObject Cell_Wall;
@@ -11,11 +9,16 @@ public class LevelCreator : MonoBehaviour
 
     void Start ()
     {
+        Options.Init();
+        CreateDungeon(Options.GetDungeonDim());
+    }
+    private void CreateDungeon(int dim)
+    {
         // Создаем подземелье требуемой размерности
         Dungeon.dungeon_map = new Dungeon.Map(dim);
         
         // Создаем пол и стены в подземелье
-        int step = SceneOptions.GetTileLength();
+        int step = Options.GetTileSize();
         for (int i = -1; i <= dim; i++)
             for (int j = -1; j <= dim; j++)
                 if (i == -1 || i == dim || j == -1 || j == dim)
@@ -46,16 +49,16 @@ public class LevelCreator : MonoBehaviour
                     }
                 }
     }
-    private static void CreateObject(ref GameObject gObject, int i, int j, string name, bool isCoordInName = true)
+    private void CreateObject(ref GameObject gObject, int i, int j, string name, bool isCoordInName = true)
     {
-        int step = SceneOptions.GetTileLength();
+        int step = Options.GetTileSize();
         GameObject newObject = Instantiate(gObject, new Vector3(i * step, 0, j * step), Quaternion.identity);
         if (isCoordInName)
             newObject.name = string.Format("{0} ({1}; {2})", name, i.ToString(), j.ToString());        
         else
             newObject.name = name;
     }
-    private static bool CheckDungeonWallNecessity(int i, int j, int min, int max)
+    private bool CheckDungeonWallNecessity(int i, int j, int min, int max)
     {
         // Проверка на то, стоит ли создавать стену или рядом ничего интересного нет
         return (IsInRange(i + 1, min, max) && IsInRange(j, min, max) && Dungeon.dungeon_map[i + 1, j].inside != Dungeon.CellType.Wall ||
@@ -63,24 +66,9 @@ public class LevelCreator : MonoBehaviour
                 IsInRange(i - 1, min, max) && IsInRange(j, min, max) && Dungeon.dungeon_map[i - 1, j].inside != Dungeon.CellType.Wall ||
                 IsInRange(i, min, max) && IsInRange(j - 1, min, max) && Dungeon.dungeon_map[i, j - 1].inside != Dungeon.CellType.Wall);
     }
-    private static bool IsInRange(int i, int min, int max)
+    private bool IsInRange(int i, int min, int max)
     {
         return min <= i && i <= max;
-    }
-	
-	void Update ()
-    {
-        NextDungeon();
-    }
-    static void NextDungeon()
-    {
-        if (GameObject.Find("Player").transform.position.x < GameObject.Find("Cell_Exit").transform.position.x + 1 &&
-            GameObject.Find("Player").transform.position.x > GameObject.Find("Cell_Exit").transform.position.x - 1 &&
-            GameObject.Find("Player").transform.position.z < GameObject.Find("Cell_Exit").transform.position.z + 1 &&
-            GameObject.Find("Player").transform.position.z > GameObject.Find("Cell_Exit").transform.position.z - 1)
-        {
-            UnityEngine.SceneManagement.SceneManager.LoadScene("Dungeon");
-        }
     }
 }
 

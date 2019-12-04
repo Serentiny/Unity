@@ -11,8 +11,13 @@ public class MainMenu : MonoBehaviour
 
 	void Start()
     {
-        isPlayerAlive = false;  //Check saves
+        Options.Init();
 
+        isPlayerAlive = false;  //Check saves
+        InitCanvas();
+    }
+    private void InitCanvas()
+    {
         resumeOn.gameObject.SetActive(isPlayerAlive);
         resumeOff.gameObject.SetActive(!isPlayerAlive);
 

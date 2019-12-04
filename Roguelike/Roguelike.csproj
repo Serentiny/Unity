@@ -83,8 +83,8 @@
     <Compile Include="Assets\Scripts\Dungeon.cs" />
     <Compile Include="Assets\Scripts\LevelCreator.cs" />
     <Compile Include="Assets\Scripts\MainMenu.cs" />
-    <Compile Include="Assets\Scripts\Player.cs" />
-    <Compile Include="Assets\Scripts\SceneOptions.cs" />
+    <Compile Include="Assets\Scripts\PlayerScript.cs" />
+    <Compile Include="Assets\Scripts\Options.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\Shaders\NewSurfaceShader.shader" />

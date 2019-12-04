@@ -105,23 +105,23 @@ public class Dungeon
                 dungeon[x][y] = value;
             }
         }
-        public static bool CanMove(SceneOptions.MoveDirection dir)
+        public static bool CanMove(Options.MoveDirection dir)
         {
             switch (dir)
             {
-                case SceneOptions.MoveDirection.Forward:
+                case Options.MoveDirection.Forward:
                     if (player.y + 1 == dungeon.Count)
                         return false;
                     return dungeon[player.x][player.y + 1].inside == CellType.Wall ? false : true;
-                case SceneOptions.MoveDirection.Right:
+                case Options.MoveDirection.Right:
                     if (player.x + 1 == dungeon.Count)
                         return false;
                     return dungeon[player.x + 1][player.y].inside == CellType.Wall ? false : true;
-                case SceneOptions.MoveDirection.Down:
+                case Options.MoveDirection.Down:
                     if (player.y == 0)
                         return false;
                     return dungeon[player.x][player.y - 1].inside == CellType.Wall ? false : true;
-                case SceneOptions.MoveDirection.Left:
+                case Options.MoveDirection.Left:
                     if (player.x == 0)
                         return false;
                     return dungeon[player.x - 1][player.y].inside == CellType.Wall ? false : true;
@@ -129,20 +129,20 @@ public class Dungeon
                     return false;
             }
         }
-        public static void MovePlayer(SceneOptions.MoveDirection dir)
+        public static void MovePlayer(Options.MoveDirection dir)
         {
             switch (dir)
             {
-                case SceneOptions.MoveDirection.Forward:
+                case Options.MoveDirection.Forward:
                     player.y++;
                     break;
-                case SceneOptions.MoveDirection.Right:
+                case Options.MoveDirection.Right:
                     player.x++;
                     break;
-                case SceneOptions.MoveDirection.Down:
+                case Options.MoveDirection.Down:
                     player.y--;
                     break;
-                case SceneOptions.MoveDirection.Left:
+                case Options.MoveDirection.Left:
                     player.x--;
                     break;
                 default:
