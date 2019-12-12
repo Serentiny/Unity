@@ -2,10 +2,8 @@
 
 public class LevelCreator : MonoBehaviour
 {
-    public GameObject Player;
-    public GameObject Cell_Empty;
-    public GameObject Cell_Wall;
-    public GameObject Cell_Exit;
+    public GameObject Player, CameraMapFull;
+    public GameObject Cell_Empty, Cell_Wall, Cell_Exit;
 
     void Start ()
     {
@@ -40,6 +38,7 @@ public class LevelCreator : MonoBehaviour
                         case Dungeon.CellType.Way_In:
                             CreateObject(ref Cell_Empty, i, j, "Floor");
                             CreateObject(ref Player, i, j, "Player", isCoordInName: false);
+                            CreateObject(ref CameraMapFull, i, j, "CameraMapFull", isCoordInName: false);
                             continue;
                         case Dungeon.CellType.Way_Out:
                             CreateObject(ref Cell_Exit, i, j, "Cell_Exit", isCoordInName: false);

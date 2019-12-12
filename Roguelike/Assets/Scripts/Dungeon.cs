@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System;
+using UnityEngine;
 
 public class Dungeon
 {
@@ -45,6 +46,14 @@ public class Dungeon
             x = UnityEngine.Random.Range(0, dim);
             y = UnityEngine.Random.Range(0, dim);
         }
+        public Vector2 GetVector2()
+        {
+            return new Vector2(x, y);
+        }
+        public Vector3 GetVector3()
+        {
+            return new Vector3(x, 0, y);
+        }
         public static bool operator ==(Coord a, Coord b)
         {
             return (a.x == b.x && a.y == b.y);
@@ -52,6 +61,14 @@ public class Dungeon
         public static bool operator !=(Coord a, Coord b)
         {
             return !(a == b);
+        }
+        public static Coord operator +(Coord a, Coord b)
+        {
+            return new Coord(a.x + b.x, a.y + b.y);
+        }
+        public static Coord operator -(Coord a, Coord b)
+        {
+            return new Coord(a.x - b.x, a.y - b.y);
         }
         public override bool Equals(object obj)
         {
@@ -104,6 +121,10 @@ public class Dungeon
             {
                 dungeon[x][y] = value;
             }
+        }
+        public Coord GetPlayerCoord()
+        {
+            return player;
         }
         public static bool CanMove(Options.MoveDirection dir)
         {
@@ -368,7 +389,7 @@ public class Dungeon
         {
             return (CalcDistance(ref from_1, ref to) < CalcDistance(ref from_2, ref to) ? from_1 : from_2);
         }
-        static int CalcDistance(ref Coord from, ref Coord to)
+        private static int CalcDistance(ref Coord from, ref Coord to)
         {
             return (Math.Abs(from.x - to.x) + Math.Abs(from.y - to.y));
         }
