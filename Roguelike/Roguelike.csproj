@@ -80,7 +80,6 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Assets\Scripts\Dungeon.cs" />
     <Compile Include="Assets\Scripts\LevelCreator.cs" />
     <Compile Include="Assets\Scripts\MainMenu.cs" />
     <Compile Include="Assets\Scripts\PlayerScript.cs" />
